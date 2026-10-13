@@ -78,9 +78,10 @@
     <section class="page-panel lab hidden" data-page-panel="lab">
       <div class="page-intro"><p class="eyebrow">ЛОКАЛЬНЫЙ ТЕСТ</p><p>Проверяйте стратегии по отдельности или запустите автоподбор. Краткие результаты видны сразу, а технический журнал открыт только при необходимости.</p></div>
       <div class="lab-grid">
-        <div class="panel">
+        <div class="panel strategy-panel">
           <div class="panel-heading"><div><p class="eyebrow">АВТОМАТИКА</p><h2>Подбор стратегии</h2></div></div>
           <button class="button primary auto-select" data-auto-select><span class="button-icon">↗</span> Автоподбор всех стратегий</button>
+          <div class="strategy-label">Проверить одну стратегию</div>
           <div class="strategy-tests">
             <button class="button secondary test-strategy" data-strategy="balanced">Сбалансированная</button>
             <button class="button secondary test-strategy" data-strategy="compatibility">Совместимость</button>
@@ -89,7 +90,6 @@
             <button class="button secondary test-strategy" data-strategy="fakeTls">Fake TLS</button>
           </div>
           <button class="danger-button stop-engine"><span class="button-icon">■</span> Остановить подбор и драйвер</button>
-          <div id="test-results" class="test-results"><span class="muted">Результаты появятся после запуска теста.</span></div>
         </div>
         <div class="lab-output">
           <div class="panel activity-panel">
