@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local Route</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <img class="brand-mark" src="assets/local-route-mark.svg" alt="">
+      <span>Local Route</span>
+    </div>
+    <div class="sidebar-label">РАБОЧЕЕ ПРОСТРАНСТВО</div>
+    <nav class="side-nav" aria-label="Навигация">
+      <button class="nav-button active" data-page="control">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
+        Управление
+      </button>
+      <button class="nav-button" data-page="lab">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6M10 3v5l-5.5 9.4A2.4 2.4 0 0 0 6.6 21h10.8a2.4 2.4 0 0 0 2.1-3.6L14 8V3M8 15h8"/></svg>
+        Проверка стратегий
+      </button>
+    </nav>
+    <div class="sidebar-foot">
+      <span class="local-dot"></span>
+      Всё работает локально
+    </div>
+  </aside>
+
+  <section class="workspace">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">LOCAL ROUTE</p>
+        <h1 id="page-title">Управление</h1>
+      </div>
+      <div class="topbar-status"><span class="status-dot" id="status-dot"></span><strong id="engine-status">Готово к подбору</strong></div>
+    </header>
+
+    <div data-page-panel="control" class="page-panel">
+      <section class="protection-card">
+        <div class="protection-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3Zm-3 9 2 2 4-4"/></svg>
+        </div>
+        <div class="protection-copy"><span>Локальная защита</span><strong id="protection-title">Выберите сервисы и запустите подбор</strong><small>Стратегия выбирается автоматически и остаётся включённой.</small></div>
+        <div class="connection-actions">
+          <button class="button primary auto-select" data-auto-select data-save-profile><span class="button-icon">↗</span> Автоподбор и запуск</button>
+          <button class="danger-button stop-engine"><span class="button-icon">■</span> Остановить</button>
+        </div>
+      </section>
+
+      <section class="dashboard-grid">
+        <div class="panel services-panel">
+          <div class="panel-heading"><div><p class="eyebrow">СЕРВИСЫ</p><h2>Защищать соединения</h2></div><span class="counter" id="domain-count">0 доменов</span></div>
+          <div class="service-list" id="service-list"></div>
+          <label class="custom-label">Свой домен <span>необязательно</span>
+            <div class="add-domain"><input id="custom-domain" placeholder="например, example.org"><button id="add-domain" aria-label="Добавить домен">+</button></div>
+          </label>
+          <div class="chips" id="custom-domains"></div>
+        </div>
+
+        <aside class="side">
+          <div class="panel diagnostics-panel">
+            <div class="panel-heading"><div><p class="eyebrow">СОСТОЯНИЕ</p><h2>Диагностика</h2></div><button class="text-button" id="run-check">Обновить</button></div>
+            <div class="diagnostics" id="diagnostics"></div>
+          </div>
+          <div class="panel updates">
+            <p class="eyebrow">ОБНОВЛЕНИЯ</p><h2>Канал релизов</h2>
+            <p>Канал с новыми версиями будет подключён позднее.</p>
+            <button id="check-updates" class="text-button">Проверить статус →</button>
+          </div>
+        </aside>
+      </section>
+    </div>
+
+    <section class="page-panel lab hidden" data-page-panel="lab">
+      <div class="page-intro"><p class="eyebrow">ЛОКАЛЬНЫЙ ТЕСТ</p><h2>Проверка стратегий</h2><p>Каждая стратегия запускается временно. Результаты и журнал остаются на этом компьютере.</p></div>
+      <div class="lab-grid">
+        <div class="panel">
+          <div class="panel-heading"><div><p class="eyebrow">АВТОМАТИКА</p><h2>Подбор стратегии</h2></div></div>
+          <button class="button primary auto-select" data-auto-select><span class="button-icon">↗</span> Автоподбор всех стратегий</button>
+          <div class="strategy-tests">
+            <button class="button secondary test-strategy" data-strategy="balanced">Сбалансированная</button>
+            <button class="button secondary test-strategy" data-strategy="compatibility">Совместимость</button>
+            <button class="button secondary test-strategy" data-strategy="split2">Split ×2</button>
+            <button class="button secondary test-strategy" data-strategy="fakeSplit">Fake Split</button>
+            <button class="button secondary test-strategy" data-strategy="fakeTls">Fake TLS</button>
+          </div>
+          <button class="danger-button stop-engine"><span class="button-icon">■</span> Остановить подбор и драйвер</button>
+          <div id="test-results" class="test-results"><span class="muted">Результаты появятся после запуска теста.</span></div>
+        </div>
+        <div class="panel log-panel">
+          <div class="panel-heading"><div><p class="eyebrow">ЖУРНАЛ</p><h2>События движка</h2></div><button id="refresh-log" class="text-button">Обновить</button></div>
+          <pre id="engine-log" class="engine-log">Нет событий.</pre>
+        </div>
+      </div>
+    </section>
+
+    <footer><span>Закрытие окна сворачивает Local Route в область уведомлений Windows.</span><button id="about" class="text-button">О проекте</button></footer>
+  </section>
+</main>
+<div id="toast" role="status"></div>
+<script src="app.js"></script>
+</body>
+</html>
