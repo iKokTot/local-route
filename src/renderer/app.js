@@ -3,6 +3,7 @@ const STRATEGY_LABELS = { balanced: 'Сбалансированная', compatib
 let state; let customDomains = []; let operationBusy = false;
 const $ = (selector) => document.querySelector(selector);
 const toast = (message) => { const node = $('#toast'); node.textContent = message; node.classList.add('show'); setTimeout(() => node.classList.remove('show'), 3300); };
+const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
 function render() {
   const selected = new Set(state.profile.services);
   $('#service-list').innerHTML = Object.entries(SERVICES).map(([key, label]) => `<label class="service"><input type="checkbox" value="${key}" ${selected.has(key) ? 'checked' : ''}><span>${label}</span></label>`).join('');
@@ -13,7 +14,13 @@ function render() {
   $('#status-dot').classList.toggle('active', state.active);
   document.querySelectorAll('[data-auto-select][data-save-profile]').forEach((button) => { button.textContent = state.active ? 'Подобрать заново' : 'Автоподбор и запуск'; });
   $('#diagnostics').innerHTML = state.diagnostics.map((item) => `<div class="diag ${item.level}"><div class="diag-label"><i></i>${item.label}</div><div class="diag-value">${item.value}</div></div>`).join('');
-  $('#engine-log').textContent = (state.logs || []).join('\n') || 'Нет событий.';
+  const logs = state.logs || [];
+  const activity = logs.filter((entry) => !entry.includes('[winws]'));
+  const technical = logs.filter((entry) => entry.includes('[winws]'));
+  $('#activity-log').innerHTML = activity.length
+    ? activity.slice(0, 14).map((entry) => `<div class="activity-item">${escapeHtml(entry)}</div>`).join('')
+    : '<span class="muted">Нет событий управления.</span>';
+  $('#engine-log').textContent = technical.length ? technical.join('\n') : 'Нет технических событий.';
 }
 function draft() { return { services: [...document.querySelectorAll('.service input:checked')].map((input) => input.value), customDomains, strategy: state.profile.strategy }; }
 async function save() { state = await window.localRoute.saveProfile(draft()); customDomains = state.profile.customDomains; render(); toast('Профиль сохранён локально.'); }

@@ -196,9 +196,12 @@ function showMainWindow() {
   mainWindow.show();
   mainWindow.focus();
 }
-function trayImage() {
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 48 48"><rect width="48" height="48" rx="15" fill="#98F5C0"/><path d="M12 34h10V25h8l6-11m-6-1 6-1 1 6" fill="none" stroke="#10271D" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="34" r="4" fill="#10271D"/><circle cx="22" cy="25" r="2.5" fill="#98F5C0" stroke="#10271D" stroke-width="3"/></svg>';
+function appIcon() {
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 48 48"><rect width="48" height="48" rx="15" fill="#98F5C0"/><path d="M12 34h10V25h8l6-11m-6-1 6-1 1 6" fill="none" stroke="#10271D" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="34" r="4" fill="#10271D"/><circle cx="22" cy="25" r="2.5" fill="#98F5C0" stroke="#10271D" stroke-width="3"/></svg>';
   return nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`);
+}
+function trayImage() {
+  return appIcon().resize({ width: 20, height: 20, quality: 'best' });
 }
 function createTray() {
   tray = new Tray(trayImage());
@@ -218,6 +221,7 @@ function createWindow() {
     minWidth: 920,
     minHeight: 650,
     title: 'Local Route',
+    icon: appIcon(),
     backgroundColor: '#10131a',
     autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true }
@@ -233,6 +237,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  if (process.platform === 'win32') app.setAppUserModelId('com.localroute.app');
   createTray();
   createWindow();
   app.on('activate', showMainWindow);
