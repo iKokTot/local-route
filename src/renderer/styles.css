@@ -146,6 +146,19 @@ input:focus, select:focus { border-color: #65b98c; box-shadow: 0 0 0 3px rgba(15
 .text-button:hover { color: #d7ffe8; }
 .updates p, .hint, .muted { color: var(--muted); }
 .updates p { margin: 10px 0 0; }
+.setting-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; }
+.setting-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; color: var(--accent); background: var(--accent-soft); }
+.setting-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.setting-copy h2 { margin: 3px 0 0; }
+.setting-copy p { margin: 0; }
+.setting-description { margin: 15px 0 0; color: var(--muted); font-size: 12px; }
+.switch { position: relative; display: inline-flex; width: 46px; height: 26px; }
+.switch input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.switch span { width: 46px; height: 26px; border: 1px solid var(--line); border-radius: 999px; background: #354554; transition: background .16s ease, border-color .16s ease; }
+.switch span::after { content: ''; position: absolute; top: 4px; left: 4px; width: 18px; height: 18px; border-radius: 50%; background: #c5d3df; transition: transform .16s ease, background .16s ease; }
+.switch input:checked + span { border-color: #65c58f; background: rgba(53, 144, 94, .58); }
+.switch input:checked + span::after { transform: translateX(20px); background: var(--accent); }
+.switch input:disabled + span { opacity: .55; cursor: wait; }
 
 .button, .danger-button {
   min-height: 44px;

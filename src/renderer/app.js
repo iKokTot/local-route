@@ -12,6 +12,10 @@ function render() {
   $('#engine-status').textContent = state.active ? `Включена · ${STRATEGY_LABELS[state.profile.strategy] || state.profile.strategy}` : 'Готово к подбору';
   $('#protection-title').textContent = state.active ? `Стратегия «${STRATEGY_LABELS[state.profile.strategy] || state.profile.strategy}» работает` : 'Выберите сервисы и запустите подбор';
   $('#status-dot').classList.toggle('active', state.active);
+  $('#autostart-toggle').checked = Boolean(state.autoStart);
+  $('#autostart-description').textContent = state.autoStart
+    ? (state.verifiedStrategy ? `Включён · стратегия «${STRATEGY_LABELS[state.verifiedStrategy] || state.verifiedStrategy}»` : 'Включён, но после изменения профиля нужен новый автоподбор.')
+    : (state.verifiedStrategy ? 'При входе в Windows запустит подтверждённую стратегию и останется в трее.' : 'Сначала выполните автоподбор, затем автозапуск можно включить.');
   document.querySelectorAll('[data-auto-select][data-save-profile]').forEach((button) => { button.textContent = state.active ? 'Подобрать заново' : 'Автоподбор и запуск'; });
   $('#diagnostics').innerHTML = state.diagnostics.map((item) => `<div class="diag ${item.level}"><div class="diag-label"><i></i>${item.label}</div><div class="diag-value">${item.value}</div></div>`).join('');
   const logs = state.logs || [];
@@ -73,5 +77,18 @@ document.addEventListener('click', async (event) => {
   }
   if (event.target.id === 'check-updates') { const result = await window.localRoute.checkUpdates(); toast(result.message); }
   if (event.target.id === 'about') window.localRoute.open('https://github.com/Flowseal/zapret-discord-youtube');
+});
+$('#autostart-toggle').addEventListener('change', async (event) => {
+  const enabled = event.target.checked;
+  event.target.disabled = true;
+  const result = await window.localRoute.setAutoStart(enabled);
+  event.target.disabled = false;
+  if (!result.ok) {
+    event.target.checked = Boolean(state.autoStart);
+    return toast(result.message);
+  }
+  state = result.state;
+  render();
+  toast(result.message);
 });
 window.localRoute.readState().then((next) => { state = next; customDomains = state.profile.customDomains; render(); });

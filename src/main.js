@@ -6,9 +6,11 @@ const https = require('node:https');
 const dns = require('node:dns').promises;
 const { createProfile, createEnginePlan, AUTO_STRATEGIES } = require('./core/profile');
 const { buildEngineArgs } = require('./core/engine');
+const { createTaskArgs, deleteTaskArgs, queryTaskArgs } = require('./core/autostart');
 
 const stateFile = () => path.join(app.getPath('userData'), 'local-route.json');
-const defaults = { profile: createProfile({ services: ['youtube', 'discord'] }), enginePath: '', active: false };
+const defaults = { profile: createProfile({ services: ['youtube', 'discord'] }), enginePath: '', active: false, autoStart: false, verifiedStrategy: null };
+const launchedFromAutoStart = process.argv.includes('--autostart');
 let engineProcess = null;
 let engineLog = [];
 let mainWindow = null;
@@ -172,6 +174,28 @@ function readState() {
   } catch { return defaults; }
 }
 function writeState(next) { fs.writeFileSync(stateFile(), JSON.stringify(next, null, 2), 'utf8'); }
+function scheduledTaskExists() {
+  if (process.platform !== 'win32') return false;
+  try {
+    execFileSync('schtasks.exe', queryTaskArgs(), { windowsHide: true, stdio: 'ignore' });
+    return true;
+  } catch { return false; }
+}
+function configureAutoStart(enabled) {
+  if (process.platform !== 'win32' || !app.isPackaged) return { ok: false, message: 'Автозапуск доступен только в собранной Windows-версии.' };
+  const state = readState();
+  if (enabled && !state.verifiedStrategy) return { ok: false, message: 'Сначала запустите автоподбор и подтвердите рабочую стратегию.' };
+  try {
+    if (enabled) execFileSync('schtasks.exe', createTaskArgs(process.execPath), { windowsHide: true, stdio: 'ignore' });
+    else if (scheduledTaskExists()) execFileSync('schtasks.exe', deleteTaskArgs(), { windowsHide: true, stdio: 'ignore' });
+    const next = { ...state, autoStart: enabled };
+    writeState(next);
+    pushLog(enabled ? 'Автозапуск Windows включён.' : 'Автозапуск Windows отключён.');
+    return { ok: true, state: next, message: enabled ? 'Автозапуск включён. При входе в Windows Local Route запустится в трее.' : 'Автозапуск отключён.' };
+  } catch {
+    return { ok: false, message: 'Не удалось изменить автозапуск. Запустите Local Route от имени администратора.' };
+  }
+}
 function readLogs() {
   try { return fs.readFileSync(logFile(), 'utf8').trim().split(/\r?\n/).filter(Boolean).slice(-80).reverse(); } catch { return engineLog; }
 }
@@ -235,20 +259,33 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
 }
 
-app.whenReady().then(() => {
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) app.quit();
+else app.on('second-instance', showMainWindow);
+
+app.whenReady().then(async () => {
   if (process.platform === 'win32') app.setAppUserModelId('com.localroute.app');
   createTray();
-  createWindow();
+  if (!launchedFromAutoStart) createWindow();
+  else {
+    const state = readState();
+    if (state.autoStart && state.verifiedStrategy) {
+      writeState({ ...state, profile: { ...state.profile, strategy: state.verifiedStrategy }, active: false });
+      pushLog(`Автозапуск: включаю подтверждённую стратегию ${state.verifiedStrategy}.`);
+      const result = await startEngine();
+      if (!result.ok) pushLog(`Автозапуск не включил защиту: ${result.message}`);
+    } else pushLog('Автозапуск пропущен: нет подтверждённой стратегии.');
+  }
   app.on('activate', showMainWindow);
 });
 app.on('before-quit', () => { isQuitting = true; if (activeOperation) activeOperation.cancelled = true; stopEngine(); });
 
-ipcMain.handle('state:read', () => { const state = { ...readState(), active: Boolean(localRouteEnginePids().length) }; return { ...state, diagnostics: diagnostics(state), logs: readLogs() }; });
+ipcMain.handle('state:read', () => { const state = { ...readState(), active: Boolean(localRouteEnginePids().length), autoStart: scheduledTaskExists() }; return { ...state, diagnostics: diagnostics(state), logs: readLogs() }; });
 ipcMain.handle('profile:save', (_event, raw) => {
   if (engineProcess && !engineProcess.killed) stopEngine();
   const state = readState();
   const profile = createProfile(raw);
-  const next = { ...state, profile, active: false };
+  const next = { ...state, profile, active: false, verifiedStrategy: null };
   writeState(next);
   return { ...next, diagnostics: diagnostics(next), plan: createEnginePlan(profile) };
 });
@@ -280,7 +317,12 @@ ipcMain.handle('engine:testStrategy', async (_event, strategy) => {
     const results = await Promise.all(probesForProfile(profile).map(async (target) => ({ ...target, ...(await probe(target.url)) })));
     if (operation.cancelled) return { ok: false, message: 'Проверка остановлена пользователем.' };
     results.forEach((result) => pushLog(`${result.label}: ${result.success ? 'успешно' : 'ошибка'} — ${result.detail}, ${result.durationMs} мс.`));
-    const message = results.every((result) => result.success) ? `Стратегия «${strategy}» прошла тест.` : `Стратегия «${strategy}» не прошла тест.`;
+    const passed = results.every((result) => result.success);
+    const message = passed ? `Стратегия «${strategy}» прошла тест.` : `Стратегия «${strategy}» не прошла тест.`;
+    const verified = passed
+      ? { ...readState(), profile, verifiedStrategy: strategy, active: false }
+      : { ...readState(), profile: state.profile, verifiedStrategy: state.verifiedStrategy, active: false };
+    writeState(verified);
     pushLog(message);
     return { ok: true, results, message, logs: readLogs() };
   } finally {
@@ -309,7 +351,7 @@ ipcMain.handle('engine:autoSelect', async () => {
         if (operation.cancelled) return { ok: false, message: 'Автоподбор остановлен пользователем.' };
         results.forEach((result, index) => pushLog(`${targets[index].label} / ${strategy}: ${result.success ? 'успешно' : 'ошибка'} — ${result.detail}, ${result.durationMs} мс.`));
         if (results.every((result) => result.success)) {
-          const next = { ...readState(), profile, active: true };
+          const next = { ...readState(), profile, active: true, verifiedStrategy: strategy };
           writeState(next); pushLog(`Автоподбор выбрал стратегию: ${strategy}.`);
           keepEngine = true;
           return { ok: true, state: { ...next, diagnostics: diagnostics(next), logs: engineLog }, message: `Подобрана стратегия: ${strategy}.` };
@@ -318,7 +360,7 @@ ipcMain.handle('engine:autoSelect', async () => {
         if (!keepEngine) stopEngine();
       }
     }
-    const restored = { ...readState(), profile: { ...state.profile, strategy: original }, active: false };
+    const restored = { ...readState(), profile: { ...state.profile, strategy: original }, active: false, verifiedStrategy: null };
     writeState(restored); pushLog('Автоподбор не нашёл рабочую стратегию.');
     return { ok: false, message: 'Автоподбор не подтвердил доступность всех выбранных сервисов. Откройте журнал — теперь там указана точная причина каждого сбоя.' };
   } finally {
@@ -329,5 +371,11 @@ ipcMain.handle('updates:check', () => {
   const source = releaseSources();
   if (!source.manifestUrl) return { channel: 'stable', status: 'waiting_for_manifest', message: source.telegramChannel ? 'Ссылка на канал сохранена. Ждём адрес подписанного манифеста.' : 'Канал обновлений подготовлен. Добавим ссылку на Telegram, когда ты её передашь.' };
   return { channel: 'stable', status: 'configured', message: 'Источник обновлений настроен. Проверка манифеста будет добавлена вместе с первым релизом.' };
+});
+ipcMain.handle('autostart:set', (_event, enabled) => {
+  const result = configureAutoStart(Boolean(enabled));
+  if (!result.ok) return result;
+  const state = { ...result.state, active: Boolean(localRouteEnginePids().length), autoStart: scheduledTaskExists() };
+  return { ...result, state: { ...state, diagnostics: diagnostics(state), logs: readLogs() } };
 });
 ipcMain.handle('external:open', (_event, url) => shell.openExternal(url));

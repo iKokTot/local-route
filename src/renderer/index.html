@@ -66,6 +66,22 @@
             <div class="panel-heading"><div><p class="eyebrow">СОСТОЯНИЕ</p><h2>Диагностика</h2></div><button class="text-button" id="run-check">Обновить</button></div>
             <div class="diagnostics" id="diagnostics"></div>
           </div>
+          <div class="panel startup-panel">
+            <div class="setting-row">
+              <div class="setting-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 3v9m0 0 4-4m-4 4L8 8M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>
+              </div>
+              <div class="setting-copy">
+                <p class="eyebrow">ЗАПУСК WINDOWS</p>
+                <h2>Автозапуск</h2>
+              </div>
+              <label class="switch" title="Включить автозапуск">
+                <input id="autostart-toggle" type="checkbox">
+                <span></span>
+              </label>
+            </div>
+            <p id="autostart-description" class="setting-description">Использует последнюю подтверждённую стратегию и остаётся в трее.</p>
+          </div>
           <div class="panel updates">
             <p class="eyebrow">ОБНОВЛЕНИЯ</p><h2>Канал релизов</h2>
             <p>Канал с новыми версиями будет подключён позднее.</p>

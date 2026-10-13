@@ -37,3 +37,13 @@ test('Windows window and tray use the rasterized Local Route icon', () => {
   assert.match(main, /local-route-logo-256\.png/);
   assert.ok(fs.statSync(icon).size > 1_000);
 });
+
+test('autostart can be controlled from the management page and starts hidden', () => {
+  const root = path.join(__dirname, '..');
+  const html = fs.readFileSync(path.join(root, 'src', 'renderer', 'index.html'), 'utf8');
+  const main = fs.readFileSync(path.join(root, 'src', 'main.js'), 'utf8');
+  assert.match(html, /id="autostart-toggle"/);
+  assert.match(main, /process\.argv\.includes\('--autostart'\)/);
+  assert.match(main, /if \(!launchedFromAutoStart\) createWindow\(\)/);
+  assert.match(main, /state\.verifiedStrategy/);
+});

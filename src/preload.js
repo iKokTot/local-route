@@ -7,5 +7,6 @@ contextBridge.exposeInMainWorld('localRoute', {
   stopEngine: () => ipcRenderer.invoke('engine:stop'),
   testStrategy: (strategy) => ipcRenderer.invoke('engine:testStrategy', strategy),
   checkUpdates: () => ipcRenderer.invoke('updates:check'),
+  setAutoStart: (enabled) => ipcRenderer.invoke('autostart:set', enabled),
   open: (url) => ipcRenderer.invoke('external:open', url)
 });
