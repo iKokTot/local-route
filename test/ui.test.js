@@ -22,12 +22,20 @@ test('strategy results have one destination and raw logs are separated', () => {
   assert.match(html, /class="technical-log"/);
 });
 
-test('window behavior includes a visible Windows title bar and a tray exit path', () => {
+test('window behavior includes a visible Windows title bar and releases its renderer in tray', () => {
   const main = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
   assert.match(main, /new Tray/);
   assert.match(main, /Открыть Local Route/);
-  assert.match(main, /mainWindow\.hide\(\)/);
+  assert.match(main, /windowToDestroy\.destroy\(\)/);
+  assert.doesNotMatch(main, /mainWindow\.hide\(\)/);
   assert.doesNotMatch(main, /titleBarStyle:\s*'hidden'/);
+});
+
+test('routine status checks use the tracked engine instead of a PowerShell process scan', () => {
+  const main = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  assert.match(main, /function engineIsRunning\(\)/);
+  assert.match(main, /active: engineIsRunning\(\)/);
+  assert.doesNotMatch(main, /active: Boolean\(localRouteEnginePids\(\)\.length\)/);
 });
 
 test('Windows window and tray use the rasterized Local Route icon', () => {

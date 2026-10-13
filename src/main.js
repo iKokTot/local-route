@@ -58,6 +58,7 @@ function pushLog(message) {
   try { fs.appendFileSync(logFile(), `${line}\n`, 'utf8'); } catch { /* logging must not break connection control */ }
 }
 function engineExecutable() { return path.join(engineRoot(), 'bin', 'winws.exe'); }
+function engineIsRunning() { return Boolean(engineProcess && !engineProcess.killed && engineProcess.exitCode === null); }
 function localRouteEnginePids() {
   const script = "$all=@(Get-CimInstance Win32_Process);$routes=@($all|Where-Object {$_.Name -eq 'Local Route.exe'}|ForEach-Object {$_.ProcessId});@($all|Where-Object {$_.Name -eq 'winws.exe' -and $routes -contains $_.ParentProcessId}|ForEach-Object {$_.ProcessId})|ConvertTo-Json -Compress";
   try {
@@ -75,7 +76,10 @@ function otherWinwsPids() {
 }
 function stopEngine() {
   if (engineProcess) expectedStops.add(engineProcess);
-  const pids = [...new Set([engineProcess?.pid, ...localRouteEnginePids()].filter(Boolean))];
+  // The tracked child is the normal path. The slower CIM lookup is only a
+  // recovery path for a process left behind after an earlier app crash.
+  const recoveredPids = engineIsRunning() ? [] : localRouteEnginePids();
+  const pids = [...new Set([engineProcess?.pid, ...recoveredPids].filter(Boolean))];
   for (const pid of pids) {
     try { execFileSync('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }); } catch { /* process may have exited between checks */ }
   }
@@ -121,7 +125,7 @@ function telegramProxyConnection() {
 }
 async function startEngine() {
   const state = readState();
-  if (engineProcess && !engineProcess.killed) return { ok: true, state };
+  if (engineIsRunning()) return { ok: true, state };
   const existing = otherWinwsPids();
   if (existing.length) return { ok: false, message: 'Обнаружен другой запущенный winws. Остановите прежний zapret/Winws, затем попробуйте снова.' };
   if (!state.profile.domains.length) return { ok: false, message: 'Выберите хотя бы один сервис или добавьте домен.' };
@@ -200,10 +204,11 @@ function readLogs() {
   try { return fs.readFileSync(logFile(), 'utf8').trim().split(/\r?\n/).filter(Boolean).slice(-80).reverse(); } catch { return engineLog; }
 }
 function diagnostics(state) {
-  const localRoutePids = localRouteEnginePids();
+  const localEngineRunning = engineIsRunning();
+  const externalWinwsPids = otherWinwsPids();
   const items = [
     { label: 'Профиль', value: state.profile.domains.length ? `${state.profile.domains.length} доменов выбрано` : 'Сервисы не выбраны', level: state.profile.domains.length ? 'ok' : 'warning' },
-    { label: 'Сетевой движок', value: otherWinwsPids().length ? 'Обнаружен внешний winws — возможен конфликт' : (localRoutePids.length ? 'Запущен Local Route' : (fs.existsSync(engineExecutable()) ? 'Готов к запуску' : 'Не найден в сборке')), level: otherWinwsPids().length ? 'warning' : (localRoutePids.length ? 'ok' : 'neutral') },
+    { label: 'Сетевой движок', value: externalWinwsPids.length ? 'Обнаружен внешний winws — возможен конфликт' : (localEngineRunning ? 'Запущен Local Route' : (fs.existsSync(engineExecutable()) ? 'Готов к запуску' : 'Не найден в сборке')), level: externalWinwsPids.length ? 'warning' : (localEngineRunning ? 'ok' : 'neutral') },
     { label: 'Приватность', value: 'Трафик и диагностика остаются на устройстве', level: 'ok' }
   ];
   if (state.profile.services.includes('telegram')) {
@@ -252,7 +257,11 @@ function createWindow() {
   mainWindow.on('close', (event) => {
     if (!isQuitting) {
       event.preventDefault();
-      mainWindow.hide();
+      // Release the Chromium renderer/GPU memory while the app works in tray.
+      // showMainWindow() creates a fresh window when the user opens it again.
+      const windowToDestroy = mainWindow;
+      mainWindow = null;
+      windowToDestroy.destroy();
     }
   });
   mainWindow.on('closed', () => { mainWindow = null; });
@@ -280,9 +289,9 @@ app.whenReady().then(async () => {
 });
 app.on('before-quit', () => { isQuitting = true; if (activeOperation) activeOperation.cancelled = true; stopEngine(); });
 
-ipcMain.handle('state:read', () => { const state = { ...readState(), active: Boolean(localRouteEnginePids().length), autoStart: scheduledTaskExists() }; return { ...state, diagnostics: diagnostics(state), logs: readLogs() }; });
+ipcMain.handle('state:read', () => { const state = { ...readState(), active: engineIsRunning(), autoStart: scheduledTaskExists() }; return { ...state, diagnostics: diagnostics(state), logs: readLogs() }; });
 ipcMain.handle('profile:save', (_event, raw) => {
-  if (engineProcess && !engineProcess.killed) stopEngine();
+  if (engineIsRunning()) stopEngine();
   const state = readState();
   const profile = createProfile(raw);
   const next = { ...state, profile, active: false, verifiedStrategy: null };
@@ -291,9 +300,9 @@ ipcMain.handle('profile:save', (_event, raw) => {
 });
 ipcMain.handle('engine:toggle', async () => {
   if (activeOperation) return { ok: false, message: 'Сначала остановите или дождитесь завершения текущей проверки.' };
-  const result = engineProcess && !engineProcess.killed ? { ok: true, state: stopEngine() } : await startEngine();
+  const result = engineIsRunning() ? { ok: true, state: stopEngine() } : await startEngine();
   if (!result.ok) return result;
-  return { ok: true, state: { ...result.state, active: Boolean(engineProcess && !engineProcess.killed), diagnostics: diagnostics({ ...result.state, active: Boolean(engineProcess && !engineProcess.killed) }), logs: engineLog } };
+  return { ok: true, state: { ...result.state, active: engineIsRunning(), diagnostics: diagnostics({ ...result.state, active: engineIsRunning() }), logs: engineLog } };
 });
 ipcMain.handle('engine:stop', () => {
   if (activeOperation) activeOperation.cancelled = true;
@@ -337,7 +346,7 @@ ipcMain.handle('engine:autoSelect', async () => {
   const original = state.profile.strategy;
   try {
     if (!state.profile.services.length) return { ok: false, message: 'Выберите сервисы для автоподбора.' };
-    if (engineProcess && !engineProcess.killed) stopEngine();
+    if (engineIsRunning()) stopEngine();
     for (const strategy of AUTO_STRATEGIES) {
       if (operation.cancelled) return { ok: false, message: 'Автоподбор остановлен пользователем.' };
       const profile = createProfile({ ...state.profile, strategy });
@@ -375,7 +384,7 @@ ipcMain.handle('updates:check', () => {
 ipcMain.handle('autostart:set', (_event, enabled) => {
   const result = configureAutoStart(Boolean(enabled));
   if (!result.ok) return result;
-  const state = { ...result.state, active: Boolean(localRouteEnginePids().length), autoStart: scheduledTaskExists() };
+  const state = { ...result.state, active: engineIsRunning(), autoStart: scheduledTaskExists() };
   return { ...result, state: { ...state, diagnostics: diagnostics(state), logs: readLogs() } };
 });
 ipcMain.handle('external:open', (_event, url) => shell.openExternal(url));
