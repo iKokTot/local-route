@@ -197,7 +197,7 @@ function showMainWindow() {
   mainWindow.focus();
 }
 function trayImage() {
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" rx="10" fill="#8cf2bc"/><path d="M10 21 21 10m-5 0h5v5" fill="none" stroke="#102117" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 48 48"><rect width="48" height="48" rx="15" fill="#98F5C0"/><path d="M12 34h10V25h8l6-11m-6-1 6-1 1 6" fill="none" stroke="#10271D" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="34" r="4" fill="#10271D"/><circle cx="22" cy="25" r="2.5" fill="#98F5C0" stroke="#10271D" stroke-width="3"/></svg>';
   return nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`);
 }
 function createTray() {
