@@ -3,6 +3,7 @@ contextBridge.exposeInMainWorld('localRoute', {
   readState: () => ipcRenderer.invoke('state:read'),
   saveProfile: (profile) => ipcRenderer.invoke('profile:save', profile),
   toggleEngine: () => ipcRenderer.invoke('engine:toggle'),
+  startVerified: () => ipcRenderer.invoke('engine:startVerified'),
   autoSelect: () => ipcRenderer.invoke('engine:autoSelect'),
   stopEngine: () => ipcRenderer.invoke('engine:stop'),
   testStrategy: (strategy) => ipcRenderer.invoke('engine:testStrategy', strategy),

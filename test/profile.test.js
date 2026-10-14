@@ -64,6 +64,21 @@ test('YouTube and Discord receive separate upstream-style TCP rules', () => {
   assert.ok(args.includes('--filter-tcp=2053,2083,2087,2096,8443'));
 });
 
+test('ALT12 mirrors the current upstream profile for selected YouTube and Discord traffic', () => {
+  const args = buildEngineArgs({
+    engineRoot: 'C:\\Engine',
+    hostListPath: 'C:\\all.txt',
+    googleHostListPath: 'C:\\youtube.txt',
+    generalHostListPath: 'C:\\general.txt',
+    profile: { services: ['youtube', 'discord'], strategy: 'alt12' }
+  });
+  assert.ok(args.includes('--dpi-desync=hostfakesplit'));
+  assert.ok(args.includes('--dpi-desync-hostfakesplit-mod=host=www.google.com'));
+  assert.ok(args.includes('--dpi-desync-split-seqovl=664'));
+  assert.ok(args.includes('--dpi-desync-fake-discord=C:\\Engine\\bin\\stun.bin'));
+  assert.ok(args.includes('--dpi-desync-repeats=3'));
+});
+
 test('Telegram cannot create an engine command while it is held back', () => {
   const profile = createProfile({ services: ['telegram'], strategy: 'fakeTls' });
   const args = buildEngineArgs({ engineRoot: 'C:\\Engine', hostListPath: 'C:\\all.txt', profile });

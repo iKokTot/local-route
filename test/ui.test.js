@@ -55,3 +55,21 @@ test('autostart can be controlled from the management page and starts hidden', (
   assert.match(main, /if \(!launchedFromAutoStart\) createWindow\(\)/);
   assert.match(main, /state\.verifiedStrategy/);
 });
+
+test('the interface offers a direct launch of the last confirmed strategy', () => {
+  const root = path.join(__dirname, '..');
+  const html = fs.readFileSync(path.join(root, 'src', 'renderer', 'index.html'), 'utf8');
+  const renderer = fs.readFileSync(path.join(root, 'src', 'renderer', 'app.js'), 'utf8');
+  const main = fs.readFileSync(path.join(root, 'src', 'main.js'), 'utf8');
+  assert.match(html, /id="start-verified"/);
+  assert.match(renderer, /startVerified\(\)/);
+  assert.match(main, /engine:startVerified/);
+});
+
+test('the desktop window opens maximized and exposes the upstream ALT12 strategy', () => {
+  const root = path.join(__dirname, '..');
+  const main = fs.readFileSync(path.join(root, 'src', 'main.js'), 'utf8');
+  const html = fs.readFileSync(path.join(root, 'src', 'renderer', 'index.html'), 'utf8');
+  assert.match(main, /mainWindow\.maximize\(\)/);
+  assert.match(html, /data-strategy="alt12"/);
+});

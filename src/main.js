@@ -244,10 +244,11 @@ function createTray() {
 }
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1120,
-    height: 760,
+    width: 1360,
+    height: 860,
     minWidth: 920,
     minHeight: 650,
+    show: false,
     title: 'Local Route',
     icon: appIcon(),
     backgroundColor: '#10131a',
@@ -266,6 +267,11 @@ function createWindow() {
   });
   mainWindow.on('closed', () => { mainWindow = null; });
   mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
+  mainWindow.once('ready-to-show', () => {
+    if (!mainWindow) return;
+    mainWindow.maximize();
+    mainWindow.show();
+  });
 }
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
@@ -303,6 +309,19 @@ ipcMain.handle('engine:toggle', async () => {
   const result = engineIsRunning() ? { ok: true, state: stopEngine() } : await startEngine();
   if (!result.ok) return result;
   return { ok: true, state: { ...result.state, active: engineIsRunning(), diagnostics: diagnostics({ ...result.state, active: engineIsRunning() }), logs: engineLog } };
+});
+ipcMain.handle('engine:startVerified', async () => {
+  if (activeOperation) return { ok: false, message: 'Сначала остановите или дождитесь завершения текущей проверки.' };
+  if (engineIsRunning()) return { ok: true, state: { ...readState(), active: true } };
+  const state = readState();
+  if (!state.verifiedStrategy) return { ok: false, message: 'Нет подтверждённой стратегии. Сначала выполните автоподбор.' };
+  const next = { ...state, profile: createProfile({ ...state.profile, strategy: state.verifiedStrategy }), active: false };
+  writeState(next);
+  pushLog(`Запуск подтверждённой стратегии: ${state.verifiedStrategy}.`);
+  const result = await startEngine();
+  if (!result.ok) return result;
+  const running = { ...result.state, active: engineIsRunning() };
+  return { ok: true, state: { ...running, diagnostics: diagnostics(running), logs: readLogs() }, message: `Запущена подтверждённая стратегия: ${state.verifiedStrategy}.` };
 });
 ipcMain.handle('engine:stop', () => {
   if (activeOperation) activeOperation.cancelled = true;

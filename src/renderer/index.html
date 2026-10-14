@@ -44,8 +44,9 @@
         <div class="protection-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3Zm-3 9 2 2 4-4"/></svg>
         </div>
-        <div class="protection-copy"><span>Локальная защита</span><strong id="protection-title">Выберите сервисы и запустите подбор</strong><small>Стратегия выбирается автоматически и остаётся включённой.</small></div>
+        <div class="protection-copy"><span>Локальная защита</span><strong id="protection-title">Выберите сервисы и запустите подбор</strong><small id="protection-description">Подбор проверит доступность и оставит включённой подходящую стратегию.</small></div>
         <div class="connection-actions">
+          <button class="button primary hidden" id="start-verified"><span class="button-icon">▶</span> Запустить проверенную</button>
           <button class="button primary auto-select" data-auto-select data-save-profile><span class="button-icon">↗</span> Автоподбор и запуск</button>
           <button class="danger-button stop-engine"><span class="button-icon">■</span> Остановить</button>
         </div>
@@ -87,6 +88,11 @@
             <p>Канал с новыми версиями будет подключён позднее.</p>
             <button id="check-updates" class="text-button">Проверить статус →</button>
           </div>
+          <div class="panel latest-panel">
+            <p class="eyebrow">ПОСЛЕДНЯЯ ПРОВЕРКА</p><h2 id="latest-strategy-title">Стратегия ещё не подтверждена</h2>
+            <p id="latest-strategy-description">Запустите автоподбор: он проверит варианты по очереди и сохранит первый подходящий.</p>
+            <button class="button secondary hidden" id="latest-start-verified"><span class="button-icon">▶</span> Запустить</button>
+          </div>
         </aside>
       </section>
     </div>
@@ -100,6 +106,7 @@
           <div class="strategy-label">Проверить одну стратегию</div>
           <div class="strategy-tests">
             <button class="button secondary test-strategy" data-strategy="balanced">Сбалансированная</button>
+            <button class="button secondary test-strategy" data-strategy="alt12">Zapret ALT12</button>
             <button class="button secondary test-strategy" data-strategy="compatibility">Совместимость</button>
             <button class="button secondary test-strategy" data-strategy="split2">Split ×2</button>
             <button class="button secondary test-strategy" data-strategy="fakeSplit">Fake Split</button>

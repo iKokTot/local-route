@@ -31,6 +31,7 @@ const SERVICE_CATALOG = Object.freeze({
 const ENABLED_SERVICE_IDS = new Set(['youtube', 'discord']);
 const STRATEGIES = Object.freeze([
   { id: 'auto', label: 'Автоподбор — все профили' },
+  { id: 'alt12', label: 'Zapret ALT12' },
   { id: 'balanced', label: 'Сбалансированная' },
   { id: 'compatibility', label: 'Совместимость' },
   { id: 'split2', label: 'Split ×2' },
