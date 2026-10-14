@@ -29,9 +29,34 @@ const SERVICE_CATALOG = Object.freeze({
 });
 // Telegram is intentionally held back until its dedicated transport is production-ready.
 const ENABLED_SERVICE_IDS = new Set(['youtube', 'discord']);
+const UPSTREAM_STRATEGIES = Object.freeze([
+  { id: 'zapretAlt', label: 'Zapret ALT' },
+  { id: 'zapretAlt2', label: 'Zapret ALT2' },
+  { id: 'zapretAlt3', label: 'Zapret ALT3' },
+  { id: 'zapretAlt4', label: 'Zapret ALT4' },
+  { id: 'zapretAlt5', label: 'Zapret ALT5' },
+  { id: 'zapretAlt6', label: 'Zapret ALT6' },
+  { id: 'zapretAlt7', label: 'Zapret ALT7' },
+  { id: 'zapretAlt8', label: 'Zapret ALT8' },
+  { id: 'zapretAlt9', label: 'Zapret ALT9' },
+  { id: 'zapretAlt10', label: 'Zapret ALT10' },
+  { id: 'zapretAlt11', label: 'Zapret ALT11' },
+  { id: 'zapretAlt12', label: 'Zapret ALT12' },
+  { id: 'zapretAlt13', label: 'Zapret ALT13' },
+  { id: 'zapretFakeTlsAuto', label: 'Zapret FAKE TLS AUTO' },
+  { id: 'zapretFakeTlsAutoAlt', label: 'Zapret FAKE TLS AUTO ALT' },
+  { id: 'zapretFakeTlsAutoAlt2', label: 'Zapret FAKE TLS AUTO ALT2' },
+  { id: 'zapretFakeTlsAutoAlt3', label: 'Zapret FAKE TLS AUTO ALT3' },
+  { id: 'zapretSimpleFake', label: 'Zapret SIMPLE FAKE' },
+  { id: 'zapretSimpleFakeAlt', label: 'Zapret SIMPLE FAKE ALT' },
+  { id: 'zapretSimpleFakeAlt2', label: 'Zapret SIMPLE FAKE ALT2' },
+  { id: 'zapretExp', label: 'Zapret EXP' },
+  { id: 'zapretBase', label: 'Zapret Standard' }
+]);
 const STRATEGIES = Object.freeze([
   { id: 'auto', label: 'Автоподбор — все профили' },
-  { id: 'alt12', label: 'Zapret ALT12' },
+  ...UPSTREAM_STRATEGIES,
+  { id: 'alt12', label: 'Упрощённый ALT12' },
   { id: 'balanced', label: 'Сбалансированная' },
   { id: 'compatibility', label: 'Совместимость' },
   { id: 'split2', label: 'Split ×2' },
@@ -39,7 +64,7 @@ const STRATEGIES = Object.freeze([
   { id: 'fakeTls', label: 'Fake TLS' }
 ]);
 const STRATEGY_IDS = new Set(STRATEGIES.map((strategy) => strategy.id));
-const AUTO_STRATEGIES = Object.freeze(STRATEGIES.filter((strategy) => strategy.id !== 'auto').map((strategy) => strategy.id));
+const AUTO_STRATEGIES = Object.freeze(UPSTREAM_STRATEGIES.map((strategy) => strategy.id));
 
 function normalizeDomain(value) {
   return String(value || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^\*\./, '').replace(/\/.*$/, '');
@@ -74,4 +99,4 @@ function createEnginePlan(profile) {
   };
 }
 
-module.exports = { SERVICE_CATALOG, ENABLED_SERVICE_IDS, STRATEGIES, AUTO_STRATEGIES, normalizeDomain, isDomain, createProfile, createEnginePlan };
+module.exports = { SERVICE_CATALOG, ENABLED_SERVICE_IDS, STRATEGIES, AUTO_STRATEGIES, STRATEGY_IDS, normalizeDomain, isDomain, createProfile, createEnginePlan };

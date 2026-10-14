@@ -103,15 +103,9 @@
         <div class="panel strategy-panel">
           <div class="panel-heading"><div><p class="eyebrow">АВТОМАТИКА</p><h2>Подбор стратегии</h2></div></div>
           <button class="button primary auto-select" data-auto-select><span class="button-icon">↗</span> Автоподбор всех стратегий</button>
-          <div class="strategy-label">Проверить одну стратегию</div>
-          <div class="strategy-tests">
-            <button class="button secondary test-strategy" data-strategy="alt12">Zapret ALT12</button>
-            <button class="button secondary test-strategy" data-strategy="balanced">Сбалансированная</button>
-            <button class="button secondary test-strategy" data-strategy="compatibility">Совместимость</button>
-            <button class="button secondary test-strategy" data-strategy="split2">Split ×2</button>
-            <button class="button secondary test-strategy" data-strategy="fakeSplit">Fake Split</button>
-            <button class="button secondary test-strategy" data-strategy="fakeTls">Fake TLS</button>
-          </div>
+          <div id="operation-progress" class="operation-progress hidden" role="status"><i></i><span>Подготовка проверки…</span></div>
+          <div class="strategy-label">Проверить одну из 22 стратегий Zapret</div>
+          <div id="strategy-tests" class="strategy-tests"></div>
           <button class="danger-button stop-engine"><span class="button-icon">■</span> Остановить подбор и драйвер</button>
         </div>
         <div class="lab-output">

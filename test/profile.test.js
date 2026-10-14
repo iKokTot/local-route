@@ -43,6 +43,14 @@ test('all fallback strategies are accepted and produce an engine command', () =>
   }
 });
 
+test('autoselect contains the complete 22-profile Zapret catalogue with distinct commands', () => {
+  assert.equal(AUTO_STRATEGIES.length, 22);
+  const commands = new Set(AUTO_STRATEGIES.map((strategy) => buildEngineArgs({
+    engineRoot: 'C:\\Engine', hostListPath: 'C:\\hosts.txt', profile: { services: ['youtube', 'discord'], strategy }
+  }).join('\n')));
+  assert.ok(commands.size >= 20);
+});
+
 test('engine command starts with a real filter and preserves shell-independent fake TLS marker', () => {
   const args = buildEngineArgs({ engineRoot: 'C:\\Engine', hostListPath: 'C:\\hosts.txt', profile: { services: ['youtube'], strategy: 'fakeTls' } });
   assert.equal(args.indexOf('--new') > args.indexOf('--filter-udp=443'), true);

@@ -71,5 +71,16 @@ test('the desktop window opens maximized and exposes the upstream ALT12 strategy
   const main = fs.readFileSync(path.join(root, 'src', 'main.js'), 'utf8');
   const html = fs.readFileSync(path.join(root, 'src', 'renderer', 'index.html'), 'utf8');
   assert.match(main, /mainWindow\.maximize\(\)/);
-  assert.match(html, /data-strategy="alt12"/);
+  assert.match(html, /strategy-tests/);
+  assert.match(fs.readFileSync(path.join(root, 'src', 'renderer', 'app.js'), 'utf8'), /zapretAlt12/);
+});
+
+test('strategy testing exposes the complete upstream catalogue and a loading indicator', () => {
+  const root = path.join(__dirname, '..');
+  const html = fs.readFileSync(path.join(root, 'src', 'renderer', 'index.html'), 'utf8');
+  const renderer = fs.readFileSync(path.join(root, 'src', 'renderer', 'app.js'), 'utf8');
+  assert.match(html, /id="strategy-tests"/);
+  assert.match(html, /id="operation-progress"/);
+  assert.match(renderer, /UPSTREAM_STRATEGY_IDS/);
+  assert.match(renderer, /setOperationBusy/);
 });

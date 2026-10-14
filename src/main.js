@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const { spawn, execFileSync } = require('node:child_process');
 const https = require('node:https');
 const dns = require('node:dns').promises;
-const { createProfile, createEnginePlan, AUTO_STRATEGIES } = require('./core/profile');
+const { createProfile, createEnginePlan, AUTO_STRATEGIES, STRATEGY_IDS } = require('./core/profile');
 const { buildEngineArgs } = require('./core/engine');
 const { createTaskArgs, deleteTaskArgs, queryTaskArgs } = require('./core/autostart');
 
@@ -16,6 +16,7 @@ let engineLog = [];
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+let logWritesSinceTrim = 0;
 const expectedStops = new WeakSet();
 let activeOperation = null;
 const TELEGRAM_DC_HOSTS = Object.freeze([
@@ -52,10 +53,22 @@ function releaseSources() {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return {}; }
 }
 function logFile() { return path.join(app.getPath('userData'), 'engine.log'); }
+function trimLogFile() {
+  try {
+    const file = logFile();
+    if (fs.statSync(file).size <= 512 * 1024) return;
+    const content = fs.readFileSync(file, 'utf8');
+    const tail = content.slice(-256 * 1024);
+    fs.writeFileSync(file, tail.slice(tail.indexOf('\n') + 1), 'utf8');
+  } catch { /* no log exists yet */ }
+}
 function pushLog(message) {
   const line = `${new Date().toLocaleTimeString('ru-RU')}  ${message}`;
   engineLog = [line, ...engineLog].slice(0, 40);
-  try { fs.appendFileSync(logFile(), `${line}\n`, 'utf8'); } catch { /* logging must not break connection control */ }
+  try {
+    fs.appendFileSync(logFile(), `${line}\n`, 'utf8');
+    if (++logWritesSinceTrim >= 100) { logWritesSinceTrim = 0; trimLogFile(); }
+  } catch { /* logging must not break connection control */ }
 }
 function engineExecutable() { return path.join(engineRoot(), 'bin', 'winws.exe'); }
 function engineIsRunning() { return Boolean(engineProcess && !engineProcess.killed && engineProcess.exitCode === null); }
@@ -280,6 +293,7 @@ else app.on('second-instance', showMainWindow);
 
 app.whenReady().then(async () => {
   if (process.platform === 'win32') app.setAppUserModelId('com.localroute.app');
+  trimLogFile();
   createTray();
   if (!launchedFromAutoStart) createWindow();
   else {
@@ -329,7 +343,7 @@ ipcMain.handle('engine:stop', () => {
   return { ...state, active: false, diagnostics: diagnostics(state), logs: readLogs() };
 });
 ipcMain.handle('engine:testStrategy', async (_event, strategy) => {
-  if (!AUTO_STRATEGIES.includes(strategy)) return { ok: false, message: 'Неизвестная стратегия.' };
+  if (!STRATEGY_IDS.has(strategy) || strategy === 'auto') return { ok: false, message: 'Неизвестная стратегия.' };
   const operation = beginOperation('test');
   if (!operation) return { ok: false, message: 'Другая проверка уже выполняется.' };
   const state = readState();

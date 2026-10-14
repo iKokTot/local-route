@@ -1,12 +1,28 @@
 const SERVICES = { youtube: 'YouTube', discord: 'Discord' };
-const STRATEGY_LABELS = { alt12: 'Zapret ALT12', balanced: 'Сбалансированная', compatibility: 'Совместимость', split2: 'Split ×2', fakeSplit: 'Fake Split', fakeTls: 'Fake TLS' };
+const STRATEGY_LABELS = {
+  zapretAlt: 'Zapret ALT', zapretAlt2: 'Zapret ALT2', zapretAlt3: 'Zapret ALT3', zapretAlt4: 'Zapret ALT4', zapretAlt5: 'Zapret ALT5', zapretAlt6: 'Zapret ALT6', zapretAlt7: 'Zapret ALT7', zapretAlt8: 'Zapret ALT8', zapretAlt9: 'Zapret ALT9', zapretAlt10: 'Zapret ALT10', zapretAlt11: 'Zapret ALT11', zapretAlt12: 'Zapret ALT12', zapretAlt13: 'Zapret ALT13',
+  zapretFakeTlsAuto: 'FAKE TLS AUTO', zapretFakeTlsAutoAlt: 'FAKE TLS AUTO ALT', zapretFakeTlsAutoAlt2: 'FAKE TLS AUTO ALT2', zapretFakeTlsAutoAlt3: 'FAKE TLS AUTO ALT3', zapretSimpleFake: 'SIMPLE FAKE', zapretSimpleFakeAlt: 'SIMPLE FAKE ALT', zapretSimpleFakeAlt2: 'SIMPLE FAKE ALT2', zapretExp: 'Zapret EXP', zapretBase: 'Zapret Standard',
+  alt12: 'Упрощённый ALT12', balanced: 'Сбалансированная', compatibility: 'Совместимость', split2: 'Split ×2', fakeSplit: 'Fake Split', fakeTls: 'Fake TLS'
+};
+const UPSTREAM_STRATEGY_IDS = Object.keys(STRATEGY_LABELS).filter((id) => id.startsWith('zapret'));
 let state; let customDomains = []; let operationBusy = false; let toastTimer;
 const $ = (selector) => document.querySelector(selector);
 const toast = (message) => { const node = $('#toast'); clearTimeout(toastTimer); node.textContent = message; node.classList.add('show'); toastTimer = setTimeout(() => node.classList.remove('show'), 3300); };
 const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
+function setOperationBusy(busy, message = 'Проверяю стратегии в фоновом режиме…') {
+  operationBusy = busy;
+  document.body.classList.toggle('operation-busy', busy);
+  const progress = $('#operation-progress');
+  if (progress) {
+    progress.classList.toggle('hidden', !busy);
+    progress.querySelector('span').textContent = message;
+  }
+  document.querySelectorAll('[data-auto-select], .test-strategy, #start-verified, #latest-start-verified').forEach((button) => { button.disabled = busy; });
+}
 function render() {
   const selected = new Set(state.profile.services);
   $('#service-list').innerHTML = Object.entries(SERVICES).map(([key, label]) => `<label class="service"><input type="checkbox" value="${key}" ${selected.has(key) ? 'checked' : ''}><span>${label}</span></label>`).join('');
+  $('#strategy-tests').innerHTML = UPSTREAM_STRATEGY_IDS.map((id) => `<button class="button secondary test-strategy" data-strategy="${id}">${STRATEGY_LABELS[id]}</button>`).join('');
   $('#custom-domains').innerHTML = customDomains.map((domain, index) => `<span class="chip">${domain}<button data-remove="${index}" title="Удалить">×</button></span>`).join('');
   $('#domain-count').textContent = `${state.profile.domains.length} доменов`;
   $('#engine-status').textContent = state.active ? `Включена · ${STRATEGY_LABELS[state.profile.strategy] || state.profile.strategy}` : 'Готово к подбору';
@@ -22,9 +38,9 @@ function render() {
   const verifiedLabel = STRATEGY_LABELS[state.verifiedStrategy] || state.verifiedStrategy;
   const canStartVerified = Boolean(state.verifiedStrategy && !state.active);
   $('#start-verified').classList.toggle('hidden', !canStartVerified);
-  $('#start-verified').textContent = `▶ Запустить «${verifiedLabel}»`;
+  $('#start-verified').textContent = `▶ Запустить прошлую: «${verifiedLabel}»`;
   $('#latest-start-verified').classList.toggle('hidden', !canStartVerified);
-  $('#latest-start-verified').textContent = `▶ Запустить «${verifiedLabel}»`;
+  $('#latest-start-verified').textContent = `▶ Запустить прошлую: «${verifiedLabel}»`;
   $('#latest-strategy-title').textContent = state.verifiedStrategy ? `Подтверждена: «${verifiedLabel}»` : 'Стратегия ещё не подтверждена';
   $('#latest-strategy-description').textContent = state.verifiedStrategy
     ? (state.active ? 'Сейчас она включена. При следующем запуске её можно будет запустить одной кнопкой.' : 'Можно запустить сразу или подобрать вариант заново, если сеть изменилась.')
@@ -54,22 +70,21 @@ document.addEventListener('click', async (event) => {
   if (event.target.id === 'refresh-log') { state = await window.localRoute.readState(); render(); }
   if (event.target.closest('#start-verified, #latest-start-verified')) {
     if (operationBusy) return;
-    operationBusy = true;
+    setOperationBusy(true, 'Запускаю сохранённую стратегию…');
     const result = await window.localRoute.startVerified();
-    operationBusy = false;
+    setOperationBusy(false);
     if (!result.ok) return toast(result.message);
     state = result.state; customDomains = state.profile.customDomains; render(); toast(result.message);
   }
-  if (event.target.closest('.stop-engine')) { state = await window.localRoute.stopEngine(); operationBusy = false; document.querySelectorAll('[data-auto-select], .test-strategy').forEach((button) => { button.disabled = false; }); render(); toast('Подбор отменён, локальный драйвер остановлен.'); }
+  if (event.target.closest('.stop-engine')) { state = await window.localRoute.stopEngine(); setOperationBusy(false); render(); toast('Подбор отменён, локальный драйвер остановлен.'); }
   if (event.target.dataset.strategy) {
     if (operationBusy) return;
-    operationBusy = true;
     const strategy = event.target.dataset.strategy;
+    setOperationBusy(true, `Проверяю стратегию «${STRATEGY_LABELS[strategy] || strategy}»…`);
     document.querySelectorAll('[data-auto-select], .test-strategy').forEach((button) => { button.disabled = true; });
     $('#test-results').innerHTML = '<span class="muted">Тест выполняется. Локальный движок будет остановлен автоматически.</span>';
     const result = await window.localRoute.testStrategy(strategy);
-    operationBusy = false;
-    document.querySelectorAll('[data-auto-select], .test-strategy').forEach((button) => { button.disabled = false; });
+    setOperationBusy(false);
     state = await window.localRoute.readState(); render();
     if (!result.ok) return toast(result.message);
     $('#test-results').innerHTML = result.results.map((item) => `<div class="test-result ${item.success ? 'ok' : 'fail'}"><strong>${item.label || SERVICES[item.service]}</strong> · ${item.success ? 'Успешно' : 'Ошибка'} · ${item.detail} · ${item.durationMs} мс<br><span>${item.url}</span></div>`).join('');
@@ -77,7 +92,7 @@ document.addEventListener('click', async (event) => {
   }
   if (event.target.closest('[data-auto-select]')) {
     if (operationBusy) return;
-    operationBusy = true;
+    setOperationBusy(true, 'Автоподбор идёт в фоновом режиме. Интерфейс остаётся доступен для прокрутки.');
     const button = event.target.closest('[data-auto-select]');
     if (button.hasAttribute('data-save-profile')) {
       state = await window.localRoute.saveProfile(draft());
@@ -86,10 +101,9 @@ document.addEventListener('click', async (event) => {
     }
     document.querySelectorAll('[data-auto-select], .test-strategy').forEach((item) => { item.disabled = true; });
     $('#test-results').innerHTML = '<div class="test-result running"><strong>Автоподбор выполняется</strong><br><span>Стратегии проверяются по очереди. Кнопка остановки доступна.</span></div>';
-    toast('Проверяю стратегии локально. Это может занять до 45 секунд.');
+    toast('Проверяю стратегии локально. Полный поиск может занять несколько минут.');
     const result = await window.localRoute.autoSelect();
-    operationBusy = false;
-    document.querySelectorAll('[data-auto-select], .test-strategy').forEach((item) => { item.disabled = false; });
+    setOperationBusy(false);
     state = await window.localRoute.readState();
     customDomains = state.profile.customDomains;
     render();

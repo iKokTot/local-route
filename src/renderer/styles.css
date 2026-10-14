@@ -31,6 +31,7 @@ body {
 button, input, select { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: wait; opacity: .65; }
+.operation-busy .auto-select:not(:disabled), .operation-busy .test-strategy:not(:disabled) { pointer-events: none; }
 
 .shell { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: 100vh; }
 .sidebar {
@@ -179,6 +180,7 @@ input:focus, select:focus { border-color: #65b98c; box-shadow: 0 0 0 3px rgba(15
 }
 .button:hover, .danger-button:hover { filter: brightness(1.06); transform: translateY(-1px); }
 .button.primary { color: var(--accent-ink); background: var(--accent); }
+.operation-busy .connection-actions .button.primary::before { content: ''; width: 14px; height: 14px; border: 2px solid rgba(16, 38, 29, .26); border-top-color: var(--accent-ink); border-radius: 50%; animation: route-spin .75s linear infinite; }
 .button.secondary { color: var(--text); border-color: var(--line); background: #334457; }
 .danger-button { color: #ffdfe2; border-color: #914854; background: var(--danger-soft); }
 
@@ -188,6 +190,9 @@ input:focus, select:focus { border-color: #65b98c; box-shadow: 0 0 0 3px rgba(15
 .strategy-panel { padding: 22px; }
 .strategy-panel > .button.primary, .strategy-panel > .danger-button { width: 100%; }
 .strategy-label { margin: 20px 0 9px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.operation-progress { display: flex; align-items: center; gap: 9px; margin: 12px 0 2px; color: var(--muted); font-size: 12px; }
+.operation-progress i { width: 15px; height: 15px; border: 2px solid rgba(150, 246, 191, .24); border-top-color: var(--accent); border-radius: 50%; animation: route-spin .75s linear infinite; }
+@keyframes route-spin { to { transform: rotate(360deg); } }
 .lab-output { display: grid; gap: 13px; min-width: 0; }
 .activity-panel { min-height: 360px; }
 .activity-log { display: grid; gap: 7px; max-height: 190px; overflow: auto; padding-right: 4px; }
@@ -200,7 +205,7 @@ input:focus, select:focus { border-color: #65b98c; box-shadow: 0 0 0 3px rgba(15
 .technical-log summary span { margin-right: auto; }
 .technical-log summary small { color: var(--muted); font-weight: 600; }
 .technical-log .engine-log { max-height: 330px; border-width: 1px 0 0; border-radius: 0; }
-.strategy-tests { display: grid; gap: 9px; margin: 0 0 12px; }
+.strategy-tests { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin: 0 0 12px; }
 .strategy-tests .button, .strategy-tests .danger-button { width: 100%; }
 .test-results { display: grid; gap: 8px; margin-top: 18px; }
 .test-result { padding: 11px 12px; border: 1px solid var(--line); border-radius: 9px; background: #1d2731; font-size: 13px; }
@@ -232,6 +237,7 @@ footer, .footer { display: flex; align-items: center; justify-content: space-bet
   .protection-icon { display: none; }
   .connection-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
   .service-list { grid-template-columns: 1fr; }
+  .strategy-tests { grid-template-columns: 1fr; }
   .panel { padding: 18px; }
 }
 @media (max-width: 480px) {
