@@ -260,7 +260,7 @@ function createWindow() {
     width: 1360,
     height: 860,
     minWidth: 920,
-    minHeight: 650,
+    minHeight: 760,
     show: false,
     title: 'Local Route',
     icon: appIcon(),

@@ -66,6 +66,24 @@ test('the interface offers a direct launch of the last confirmed strategy', () =
   assert.match(main, /engine:startVerified/);
 });
 
+test('release and source links are compactly available in the sidebar', () => {
+  const root = path.join(__dirname, '..');
+  const html = fs.readFileSync(path.join(root, 'src', 'renderer', 'index.html'), 'utf8');
+  const renderer = fs.readFileSync(path.join(root, 'src', 'renderer', 'app.js'), 'utf8');
+  const sources = JSON.parse(fs.readFileSync(path.join(root, 'src', 'config', 'release-sources.json'), 'utf8'));
+  assert.match(html, /id="open-release-channel"/);
+  assert.match(html, /id="open-repository"/);
+  assert.match(renderer, /https:\/\/t\.me\/TheLocalRoute/);
+  assert.equal(sources.telegramChannel, 'https://t.me/TheLocalRoute');
+});
+
+test('protection actions stay together instead of becoming independent grid cells', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'styles.css'), 'utf8');
+  assert.match(css, /\.connection-actions \{ display: grid;/);
+  assert.match(css, /\.connection-actions \.danger-button \{ grid-column: 1 \/ -1;/);
+  assert.match(css, /\.startup-panel \{ grid-column: 1 \/ -1;/);
+});
+
 test('the desktop window opens maximized and exposes the upstream ALT12 strategy', () => {
   const root = path.join(__dirname, '..');
   const main = fs.readFileSync(path.join(root, 'src', 'main.js'), 'utf8');

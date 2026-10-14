@@ -24,6 +24,17 @@
         Проверка стратегий
       </button>
     </nav>
+    <div class="sidebar-label sidebar-links-label">ССЫЛКИ</div>
+    <nav class="side-nav sidebar-links" aria-label="Полезные ссылки">
+      <button class="nav-button nav-link" id="open-release-channel">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 4-3.1 16-5.8-4.2-3.2 3.1.5-4.5 8.3-7.5-10 6.2L3 11z"/></svg>
+        Канал релизов
+      </button>
+      <button class="nav-button nav-link" id="open-repository">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14"/></svg>
+        Исходный код
+      </button>
+    </nav>
     <div class="sidebar-foot">
       <span class="local-dot"></span>
       Всё работает локально
@@ -83,16 +94,6 @@
             </div>
             <p id="autostart-description" class="setting-description">Использует последнюю подтверждённую стратегию и остаётся в трее.</p>
           </div>
-          <div class="panel updates">
-            <p class="eyebrow">ОБНОВЛЕНИЯ</p><h2>Канал релизов</h2>
-            <p>Канал с новыми версиями будет подключён позднее.</p>
-            <button id="check-updates" class="text-button">Проверить статус →</button>
-          </div>
-          <div class="panel latest-panel">
-            <p class="eyebrow">ПОСЛЕДНЯЯ ПРОВЕРКА</p><h2 id="latest-strategy-title">Стратегия ещё не подтверждена</h2>
-            <p id="latest-strategy-description">Запустите автоподбор: он проверит варианты по очереди и сохранит первый подходящий.</p>
-            <button class="button secondary hidden" id="latest-start-verified"><span class="button-icon">▶</span> Запустить</button>
-          </div>
         </aside>
       </section>
     </div>
@@ -122,7 +123,7 @@
       </div>
     </section>
 
-    <footer><span>Закрытие окна сворачивает Local Route в область уведомлений Windows.</span><button id="about" class="text-button">О проекте</button></footer>
+    <footer><span>Закрытие окна сворачивает Local Route в область уведомлений Windows.</span><span>Ссылки и обновления — в левой панели.</span></footer>
   </section>
 </main>
 <div id="toast" role="status"></div>

@@ -17,7 +17,7 @@ function setOperationBusy(busy, message = 'Проверяю стратегии �
     progress.classList.toggle('hidden', !busy);
     progress.querySelector('span').textContent = message;
   }
-  document.querySelectorAll('[data-auto-select], .test-strategy, #start-verified, #latest-start-verified').forEach((button) => { button.disabled = busy; });
+  document.querySelectorAll('[data-auto-select], .test-strategy, #start-verified').forEach((button) => { button.disabled = busy; });
 }
 function render() {
   const selected = new Set(state.profile.services);
@@ -39,12 +39,6 @@ function render() {
   const canStartVerified = Boolean(state.verifiedStrategy && !state.active);
   $('#start-verified').classList.toggle('hidden', !canStartVerified);
   $('#start-verified').textContent = `▶ Запустить прошлую: «${verifiedLabel}»`;
-  $('#latest-start-verified').classList.toggle('hidden', !canStartVerified);
-  $('#latest-start-verified').textContent = `▶ Запустить прошлую: «${verifiedLabel}»`;
-  $('#latest-strategy-title').textContent = state.verifiedStrategy ? `Подтверждена: «${verifiedLabel}»` : 'Стратегия ещё не подтверждена';
-  $('#latest-strategy-description').textContent = state.verifiedStrategy
-    ? (state.active ? 'Сейчас она включена. При следующем запуске её можно будет запустить одной кнопкой.' : 'Можно запустить сразу или подобрать вариант заново, если сеть изменилась.')
-    : 'Запустите автоподбор: он проверит варианты по очереди и сохранит первый подходящий.';
   document.querySelectorAll('[data-auto-select][data-save-profile]').forEach((button) => { button.textContent = state.active ? 'Подобрать заново' : (state.verifiedStrategy ? 'Подобрать заново' : 'Автоподбор и запуск'); });
   $('#diagnostics').innerHTML = state.diagnostics.map((item) => `<div class="diag ${item.level}"><div class="diag-label"><i></i>${item.label}</div><div class="diag-value">${item.value}</div></div>`).join('');
   const logs = state.logs || [];
@@ -68,7 +62,7 @@ document.addEventListener('click', async (event) => {
   if (event.target.dataset.remove !== undefined) { customDomains.splice(Number(event.target.dataset.remove), 1); await save(); }
   if (event.target.id === 'run-check') { state = await window.localRoute.readState(); render(); toast('Локальная диагностика обновлена.'); }
   if (event.target.id === 'refresh-log') { state = await window.localRoute.readState(); render(); }
-  if (event.target.closest('#start-verified, #latest-start-verified')) {
+  if (event.target.closest('#start-verified')) {
     if (operationBusy) return;
     setOperationBusy(true, 'Запускаю сохранённую стратегию…');
     const result = await window.localRoute.startVerified();
@@ -110,8 +104,8 @@ document.addEventListener('click', async (event) => {
     $('#test-results').innerHTML = `<div class="test-result ${result.ok ? 'ok' : 'fail'}"><strong>${result.ok ? 'Рабочая стратегия найдена' : 'Автоподбор завершён'}</strong><br><span>${result.message}</span></div>`;
     toast(result.message);
   }
-  if (event.target.id === 'check-updates') { const result = await window.localRoute.checkUpdates(); toast(result.message); }
-  if (event.target.id === 'about') window.localRoute.open('https://github.com/Flowseal/zapret-discord-youtube');
+  if (event.target.closest('#open-release-channel')) window.localRoute.open('https://t.me/TheLocalRoute');
+  if (event.target.closest('#open-repository')) window.localRoute.open('https://github.com/iKokTot/local-route');
 });
 $('#autostart-toggle').addEventListener('change', async (event) => {
   const enabled = event.target.checked;
