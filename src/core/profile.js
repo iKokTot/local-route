@@ -66,6 +66,11 @@ const STRATEGIES = Object.freeze([
 const STRATEGY_IDS = new Set(STRATEGIES.map((strategy) => strategy.id));
 const AUTO_STRATEGIES = Object.freeze(UPSTREAM_STRATEGIES.map((strategy) => strategy.id));
 
+function orderedAutoStrategies(preferredStrategy) {
+  if (!preferredStrategy || !STRATEGY_IDS.has(preferredStrategy) || preferredStrategy === 'auto') return [...AUTO_STRATEGIES];
+  return [preferredStrategy, ...AUTO_STRATEGIES.filter((strategy) => strategy !== preferredStrategy)];
+}
+
 function normalizeDomain(value) {
   return String(value || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^\*\./, '').replace(/\/.*$/, '');
 }
@@ -99,4 +104,4 @@ function createEnginePlan(profile) {
   };
 }
 
-module.exports = { SERVICE_CATALOG, ENABLED_SERVICE_IDS, STRATEGIES, AUTO_STRATEGIES, STRATEGY_IDS, normalizeDomain, isDomain, createProfile, createEnginePlan };
+module.exports = { SERVICE_CATALOG, ENABLED_SERVICE_IDS, STRATEGIES, AUTO_STRATEGIES, STRATEGY_IDS, orderedAutoStrategies, normalizeDomain, isDomain, createProfile, createEnginePlan };

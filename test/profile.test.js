@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createProfile, createEnginePlan, isDomain, AUTO_STRATEGIES } = require('../src/core/profile');
+const { createProfile, createEnginePlan, isDomain, AUTO_STRATEGIES, orderedAutoStrategies } = require('../src/core/profile');
 const { buildEngineArgs } = require('../src/core/engine');
 
 test('profile expands selected services and removes duplicate domains', () => {
@@ -49,6 +49,13 @@ test('autoselect contains the complete 22-profile Zapret catalogue with distinct
     engineRoot: 'C:\\Engine', hostListPath: 'C:\\hosts.txt', profile: { services: ['youtube', 'discord'], strategy }
   }).join('\n')));
   assert.ok(commands.size >= 20);
+});
+
+test('the previous verified strategy is tested first without duplicating catalogue entries', () => {
+  const ordered = orderedAutoStrategies('zapretAlt12');
+  assert.equal(ordered[0], 'zapretAlt12');
+  assert.equal(ordered.length, AUTO_STRATEGIES.length);
+  assert.equal(new Set(ordered).size, AUTO_STRATEGIES.length);
 });
 
 test('engine command starts with a real filter and preserves shell-independent fake TLS marker', () => {

@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const { spawn, execFileSync } = require('node:child_process');
 const https = require('node:https');
 const dns = require('node:dns').promises;
-const { createProfile, createEnginePlan, AUTO_STRATEGIES, STRATEGY_IDS } = require('./core/profile');
+const { createProfile, createEnginePlan, orderedAutoStrategies, STRATEGY_IDS } = require('./core/profile');
 const { buildEngineArgs } = require('./core/engine');
 const { createTaskArgs, deleteTaskArgs, queryTaskArgs } = require('./core/autostart');
 
@@ -16,6 +16,10 @@ let engineLog = [];
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+let mainWindowReady = false;
+let showWindowWhenReady = false;
+let cachedAutoStart = false;
+let externalWinwsCache = { checkedAt: 0, pids: [] };
 let logWritesSinceTrim = 0;
 const expectedStops = new WeakSet();
 let activeOperation = null;
@@ -81,49 +85,91 @@ function localRouteEnginePids() {
     return Array.isArray(result) ? result.map(Number) : [Number(result)];
   } catch { return []; }
 }
-function otherWinwsPids() {
+function otherWinwsPids({ force = false } = {}) {
+  const now = Date.now();
+  if (!force && now - externalWinwsCache.checkedAt < 2500) return externalWinwsCache.pids;
   try {
     const rows = execFileSync('tasklist.exe', ['/FI', 'IMAGENAME eq winws.exe', '/FO', 'CSV', '/NH'], { encoding: 'utf8', windowsHide: true });
-    return rows.split(/\r?\n/).map((line) => /^"winws\.exe","(\d+)"/i.exec(line)?.[1]).filter(Boolean).map(Number).filter((pid) => pid !== engineProcess?.pid);
-  } catch { return []; }
+    const pids = rows.split(/\r?\n/).map((line) => /^"winws\.exe","(\d+)"/i.exec(line)?.[1]).filter(Boolean).map(Number).filter((pid) => pid !== engineProcess?.pid);
+    externalWinwsCache = { checkedAt: now, pids };
+    return pids;
+  } catch {
+    externalWinwsCache = { checkedAt: now, pids: [] };
+    return [];
+  }
 }
-function stopEngine() {
+function stopEngine({ silent = false, recover = true } = {}) {
   if (engineProcess) expectedStops.add(engineProcess);
   // The tracked child is the normal path. The slower CIM lookup is only a
   // recovery path for a process left behind after an earlier app crash.
-  const recoveredPids = engineIsRunning() ? [] : localRouteEnginePids();
+  const recoveredPids = !recover || engineIsRunning() ? [] : localRouteEnginePids();
   const pids = [...new Set([engineProcess?.pid, ...recoveredPids].filter(Boolean))];
   for (const pid of pids) {
     try { execFileSync('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }); } catch { /* process may have exited between checks */ }
   }
   engineProcess = null;
-  const state = { ...readState(), active: false }; writeState(state); pushLog('Движок остановлен.');
+  const state = { ...readState(), active: false };
+  if (!silent) { writeState(state); pushLog('Движок остановлен.'); }
   return state;
 }
 function waitForEarlyExit(child, timeoutMs = 900) {
   return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve(null), timeoutMs);
-    child.once('error', (error) => { clearTimeout(timer); resolve({ error }); });
-    child.once('exit', (code) => { clearTimeout(timer); resolve({ code }); });
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.off('error', onError);
+      child.off('exit', onExit);
+      child.stdout?.off('data', onOutput);
+      child.stderr?.off('data', onOutput);
+      resolve(value);
+    };
+    const onError = (error) => finish({ error });
+    const onExit = (code) => finish({ code });
+    // winws reports this shortly after WinDivert is ready. Using it avoids an
+    // unnecessary 900ms delay before every strategy in the selector.
+    const onOutput = (chunk) => { if (/windivert initialized\. capture is started/i.test(String(chunk))) finish(null); };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    child.once('error', onError);
+    child.once('exit', onExit);
+    child.stdout?.on('data', onOutput);
+    child.stderr?.on('data', onOutput);
   });
 }
-function probe(url) {
+function probe(url, { timeoutMs = 6500 } = {}) {
   return new Promise((resolve) => {
     const startedAt = Date.now();
     let settled = false;
     const finish = (success, detail) => { if (!settled) { settled = true; clearTimeout(timer); resolve({ success, detail, durationMs: Date.now() - startedAt }); } };
-    const request = https.get(url, { timeout: 5500, headers: { 'User-Agent': 'LocalRoute/0.1' } }, (response) => {
+    const request = https.get(url, { timeout: Math.max(1000, timeoutMs - 800), headers: { 'User-Agent': 'LocalRoute/0.1' } }, (response) => {
       response.resume();
       const success = response.statusCode >= 200 && response.statusCode < 500;
       finish(success, `HTTP ${response.statusCode}`);
     });
-    const timer = setTimeout(() => { request.destroy(); finish(false, 'Тайм-аут 6,5 с'); }, 6500);
+    const timer = setTimeout(() => { request.destroy(); finish(false, `Тайм-аут ${(timeoutMs / 1000).toLocaleString('ru-RU')} с`); }, timeoutMs);
     request.once('timeout', () => { request.destroy(); finish(false, 'Тайм-аут соединения'); });
     request.once('error', (error) => finish(false, `${error.code || 'Ошибка сети'}: ${error.message}`));
   });
 }
 function probesForProfile(profile) {
   return profile.services.flatMap((service) => (SERVICE_PROBES[service] || []).map((target) => ({ service, ...target })));
+}
+function quickProbesForProfile(profile) {
+  const targets = probesForProfile(profile);
+  return profile.services.map((service) => targets.find((target) => target.service === service)).filter(Boolean);
+}
+async function probeTargets(targets, { timeoutMs = 6500, concurrency = 2 } = {}) {
+  const results = new Array(targets.length);
+  let nextIndex = 0;
+  const worker = async () => {
+    while (nextIndex < targets.length) {
+      const index = nextIndex++;
+      results[index] = { ...targets[index], ...(await probe(targets[index].url, { timeoutMs })) };
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, targets.length) }, worker));
+  return results;
 }
 async function resolveTelegramAddresses() {
   const settled = await Promise.allSettled(TELEGRAM_DC_HOSTS.map((host) => dns.resolve4(host)));
@@ -139,7 +185,7 @@ function telegramProxyConnection() {
 async function startEngine() {
   const state = readState();
   if (engineIsRunning()) return { ok: true, state };
-  const existing = otherWinwsPids();
+  const existing = otherWinwsPids({ force: true });
   if (existing.length) return { ok: false, message: 'Обнаружен другой запущенный winws. Остановите прежний zapret/Winws, затем попробуйте снова.' };
   if (!state.profile.domains.length) return { ok: false, message: 'Выберите хотя бы один сервис или добавьте домен.' };
   const executable = engineExecutable();
@@ -191,6 +237,9 @@ function readState() {
   } catch { return defaults; }
 }
 function writeState(next) { fs.writeFileSync(stateFile(), JSON.stringify(next, null, 2), 'utf8'); }
+function profilesTargetSame(left, right) {
+  return left.services.join('\n') === right.services.join('\n') && left.domains.join('\n') === right.domains.join('\n');
+}
 function scheduledTaskExists() {
   if (process.platform !== 'win32') return false;
   try {
@@ -205,6 +254,7 @@ function configureAutoStart(enabled) {
   try {
     if (enabled) execFileSync('schtasks.exe', createTaskArgs(process.execPath), { windowsHide: true, stdio: 'ignore' });
     else if (scheduledTaskExists()) execFileSync('schtasks.exe', deleteTaskArgs(), { windowsHide: true, stdio: 'ignore' });
+    cachedAutoStart = enabled;
     const next = { ...state, autoStart: enabled };
     writeState(next);
     pushLog(enabled ? 'Автозапуск Windows включён.' : 'Автозапуск Windows отключён.');
@@ -234,8 +284,13 @@ function diagnostics(state) {
 }
 
 function showMainWindow() {
-  if (!mainWindow) createWindow();
-  mainWindow.show();
+  showWindowWhenReady = true;
+  if (!mainWindow) {
+    createWindow({ showOnReady: true });
+    return;
+  }
+  if (!mainWindowReady) return;
+  if (!mainWindow.isVisible()) mainWindow.show();
   mainWindow.focus();
 }
 function appIcon() {
@@ -255,7 +310,9 @@ function createTray() {
   ]));
   tray.on('click', showMainWindow);
 }
-function createWindow() {
+function createWindow({ showOnReady = true } = {}) {
+  mainWindowReady = false;
+  showWindowWhenReady = showOnReady;
   mainWindow = new BrowserWindow({
     width: 1360,
     height: 860,
@@ -271,19 +328,21 @@ function createWindow() {
   mainWindow.on('close', (event) => {
     if (!isQuitting) {
       event.preventDefault();
-      // Release the Chromium renderer/GPU memory while the app works in tray.
-      // showMainWindow() creates a fresh window when the user opens it again.
-      const windowToDestroy = mainWindow;
-      mainWindow = null;
-      windowToDestroy.destroy();
+      // Keep the ready renderer alive: a tray click only reveals the window
+      // instead of cold-starting Chromium again.
+      mainWindow.hide();
     }
   });
-  mainWindow.on('closed', () => { mainWindow = null; });
+  mainWindow.on('minimize', (event) => { event.preventDefault(); mainWindow.hide(); });
+  mainWindow.on('closed', () => { mainWindow = null; mainWindowReady = false; });
   mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
   mainWindow.once('ready-to-show', () => {
     if (!mainWindow) return;
+    mainWindowReady = true;
     mainWindow.maximize();
-    mainWindow.show();
+    if (showWindowWhenReady) {
+      mainWindow.show();
+    }
   });
 }
 
@@ -294,6 +353,7 @@ else app.on('second-instance', showMainWindow);
 app.whenReady().then(async () => {
   if (process.platform === 'win32') app.setAppUserModelId('com.localroute.app');
   trimLogFile();
+  cachedAutoStart = scheduledTaskExists();
   createTray();
   if (!launchedFromAutoStart) createWindow();
   else {
@@ -304,17 +364,23 @@ app.whenReady().then(async () => {
       const result = await startEngine();
       if (!result.ok) pushLog(`Автозапуск не включил защиту: ${result.message}`);
     } else pushLog('Автозапуск пропущен: нет подтверждённой стратегии.');
+    // Do not compete with Windows sign-in. Once the desktop is usable, load
+    // the renderer invisibly so opening from tray is instant.
+    const warmup = setTimeout(() => { if (!mainWindow && !isQuitting) createWindow({ showOnReady: false }); }, 8000);
+    warmup.unref?.();
   }
   app.on('activate', showMainWindow);
 });
 app.on('before-quit', () => { isQuitting = true; if (activeOperation) activeOperation.cancelled = true; stopEngine(); });
 
-ipcMain.handle('state:read', () => { const state = { ...readState(), active: engineIsRunning(), autoStart: scheduledTaskExists() }; return { ...state, diagnostics: diagnostics(state), logs: readLogs() }; });
+ipcMain.handle('state:read', () => { const state = { ...readState(), active: engineIsRunning(), autoStart: cachedAutoStart }; return { ...state, diagnostics: diagnostics(state), logs: readLogs() }; });
 ipcMain.handle('profile:save', (_event, raw) => {
   if (engineIsRunning()) stopEngine();
   const state = readState();
   const profile = createProfile(raw);
-  const next = { ...state, profile, active: false, verifiedStrategy: null };
+  // Keep the validated option when a user simply opens the panel or saves an
+  // unchanged set of domains. Any route change still forces a fresh test.
+  const next = { ...state, profile, active: false, verifiedStrategy: profilesTargetSame(state.profile, profile) ? state.verifiedStrategy : null };
   writeState(next);
   return { ...next, diagnostics: diagnostics(next), plan: createEnginePlan(profile) };
 });
@@ -349,14 +415,14 @@ ipcMain.handle('engine:testStrategy', async (_event, strategy) => {
   const state = readState();
   try {
     if (!state.profile.services.length) return { ok: false, message: 'Выберите сервисы для теста.' };
-    if (otherWinwsPids().length) return { ok: false, message: 'Сначала остановите внешний zapret/Winws: одновременные движки нельзя тестировать корректно.' };
+    if (otherWinwsPids({ force: true }).length) return { ok: false, message: 'Сначала остановите внешний zapret/Winws: одновременные движки нельзя тестировать корректно.' };
     stopEngine();
     const profile = createProfile({ ...state.profile, strategy });
     writeState({ ...state, profile, active: false });
     pushLog(`Тест стратегии «${strategy}» начат.`);
     const started = await startEngine();
     if (!started.ok) return started;
-    const results = await Promise.all(probesForProfile(profile).map(async (target) => ({ ...target, ...(await probe(target.url)) })));
+    const results = await probeTargets(probesForProfile(profile));
     if (operation.cancelled) return { ok: false, message: 'Проверка остановлена пользователем.' };
     results.forEach((result) => pushLog(`${result.label}: ${result.success ? 'успешно' : 'ошибка'} — ${result.detail}, ${result.durationMs} мс.`));
     const passed = results.every((result) => result.success);
@@ -380,7 +446,7 @@ ipcMain.handle('engine:autoSelect', async () => {
   try {
     if (!state.profile.services.length) return { ok: false, message: 'Выберите сервисы для автоподбора.' };
     if (engineIsRunning()) stopEngine();
-    for (const strategy of AUTO_STRATEGIES) {
+    for (const strategy of orderedAutoStrategies(state.verifiedStrategy)) {
       if (operation.cancelled) return { ok: false, message: 'Автоподбор остановлен пользователем.' };
       const profile = createProfile({ ...state.profile, strategy });
       writeState({ ...state, profile, active: false });
@@ -389,7 +455,20 @@ ipcMain.handle('engine:autoSelect', async () => {
         const started = await startEngine();
         if (!started.ok) { writeState({ ...state, profile: { ...state.profile, strategy: original }, active: false }); return started; }
         const targets = probesForProfile(profile);
-        const results = await Promise.all(targets.map((target) => probe(target.url)));
+        const quickTargets = quickProbesForProfile(profile);
+        // First gate: one endpoint per selected service, at most two parallel
+        // connections and a short timeout. Full diagnostics run only for a
+        // viable candidate, keeping the whole desktop responsive.
+        const quickResults = await probeTargets(quickTargets, { timeoutMs: 3200, concurrency: 2 });
+        if (operation.cancelled) return { ok: false, message: 'Автоподбор остановлен пользователем.' };
+        if (!quickResults.every((result) => result.success)) {
+          quickResults.forEach((result) => pushLog(`${result.label} / ${strategy}: ${result.success ? 'успешно' : 'ошибка'} — ${result.detail}, ${result.durationMs} мс.`));
+          continue;
+        }
+        const quickUrls = new Set(quickTargets.map((target) => target.url));
+        const detailedTargets = targets.filter((target) => !quickUrls.has(target.url));
+        const detailedResults = await probeTargets(detailedTargets, { timeoutMs: 6500, concurrency: 2 });
+        const results = [...quickResults, ...detailedResults];
         if (operation.cancelled) return { ok: false, message: 'Автоподбор остановлен пользователем.' };
         results.forEach((result, index) => pushLog(`${targets[index].label} / ${strategy}: ${result.success ? 'успешно' : 'ошибка'} — ${result.detail}, ${result.durationMs} мс.`));
         if (results.every((result) => result.success)) {
@@ -399,7 +478,7 @@ ipcMain.handle('engine:autoSelect', async () => {
           return { ok: true, state: { ...next, diagnostics: diagnostics(next), logs: engineLog }, message: `Подобрана стратегия: ${strategy}.` };
         }
       } finally {
-        if (!keepEngine) stopEngine();
+        if (!keepEngine) stopEngine({ silent: true, recover: false });
       }
     }
     const restored = { ...readState(), profile: { ...state.profile, strategy: original }, active: false, verifiedStrategy: null };
@@ -417,7 +496,7 @@ ipcMain.handle('updates:check', () => {
 ipcMain.handle('autostart:set', (_event, enabled) => {
   const result = configureAutoStart(Boolean(enabled));
   if (!result.ok) return result;
-  const state = { ...result.state, active: engineIsRunning(), autoStart: scheduledTaskExists() };
+  const state = { ...result.state, active: engineIsRunning(), autoStart: cachedAutoStart };
   return { ...result, state: { ...state, diagnostics: diagnostics(state), logs: readLogs() } };
 });
 ipcMain.handle('external:open', (_event, url) => shell.openExternal(url));

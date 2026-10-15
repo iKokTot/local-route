@@ -22,13 +22,21 @@ test('strategy results have one destination and raw logs are separated', () => {
   assert.match(html, /class="technical-log"/);
 });
 
-test('window behavior includes a visible Windows title bar and releases its renderer in tray', () => {
+test('window behavior includes a visible Windows title bar and keeps its renderer warm in tray', () => {
   const main = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
   assert.match(main, /new Tray/);
   assert.match(main, /Открыть Local Route/);
-  assert.match(main, /windowToDestroy\.destroy\(\)/);
-  assert.doesNotMatch(main, /mainWindow\.hide\(\)/);
+  assert.match(main, /mainWindow\.hide\(\)/);
+  assert.match(main, /createWindow\(\{ showOnReady: false \}\)/);
   assert.doesNotMatch(main, /titleBarStyle:\s*'hidden'/);
+});
+
+test('tray state avoids spawning scheduled-task and process checks on every renderer read', () => {
+  const main = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  assert.match(main, /let cachedAutoStart = false/);
+  assert.match(main, /autoStart: cachedAutoStart/);
+  assert.match(main, /externalWinwsCache/);
+  assert.match(main, /otherWinwsPids\(\{ force: true \}\)/);
 });
 
 test('routine status checks use the tracked engine instead of a PowerShell process scan', () => {
@@ -101,4 +109,12 @@ test('strategy testing exposes the complete upstream catalogue and a loading ind
   assert.match(html, /id="operation-progress"/);
   assert.match(renderer, /UPSTREAM_STRATEGY_IDS/);
   assert.match(renderer, /setOperationBusy/);
+});
+
+test('automatic selection uses staged, low-concurrency probes before a full check', () => {
+  const main = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  assert.match(main, /quickProbesForProfile/);
+  assert.match(main, /timeoutMs: 3200, concurrency: 2/);
+  assert.match(main, /orderedAutoStrategies\(state\.verifiedStrategy\)/);
+  assert.match(main, /windivert initialized/);
 });
