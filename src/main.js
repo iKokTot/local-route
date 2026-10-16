@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, safeStorage } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { spawn, execFileSync } = require('node:child_process');
@@ -7,11 +7,13 @@ const dns = require('node:dns').promises;
 const { createProfile, createEnginePlan, orderedAutoStrategies, STRATEGY_IDS } = require('./core/profile');
 const { buildEngineArgs } = require('./core/engine');
 const { createTaskArgs, deleteTaskArgs, queryTaskArgs } = require('./core/autostart');
+const { createVlessProfile, createSingBoxConfig, vlessProbe } = require('./core/vless');
 
 const stateFile = () => path.join(app.getPath('userData'), 'local-route.json');
-const defaults = { profile: createProfile({ services: ['youtube', 'discord'] }), enginePath: '', active: false, autoStart: false, verifiedStrategy: null };
+const defaults = { profile: createProfile({ services: ['youtube', 'discord'] }), enginePath: '', active: false, autoStart: false, verifiedStrategy: null, vless: createVlessProfile(), vlessConfigured: false, vlessActive: false };
 const launchedFromAutoStart = process.argv.includes('--autostart');
 let engineProcess = null;
+let vlessProcess = null;
 let engineLog = [];
 let mainWindow = null;
 let tray = null;
@@ -52,6 +54,89 @@ function finishOperation(operation) {
 }
 
 function engineRoot() { return app.isPackaged ? path.join(process.resourcesPath, 'app', 'engine') : path.join(__dirname, '..', 'engine'); }
+function singBoxExecutable() { return path.join(engineRoot(), 'sing-box', 'sing-box-1.14.2-windows-amd64', 'sing-box.exe'); }
+function vlessConfigPath() { return path.join(app.getPath('userData'), 'runtime', 'sing-box.json'); }
+function vlessIsRunning() { return Boolean(vlessProcess && !vlessProcess.killed && vlessProcess.exitCode === null); }
+function encodeVlessUri(uri) {
+  if (!safeStorage.isEncryptionAvailable()) throw new Error('Шифрование Windows недоступно. Войдите в обычную учётную запись Windows и попробуйте снова.');
+  return safeStorage.encryptString(uri).toString('base64');
+}
+function decodeVlessUri(state) {
+  if (!state.vlessSecret || !safeStorage.isEncryptionAvailable()) return '';
+  try { return safeStorage.decryptString(Buffer.from(state.vlessSecret, 'base64')); } catch { return ''; }
+}
+function stopVless({ silent = false } = {}) {
+  const child = vlessProcess;
+  if (child) expectedStops.add(child);
+  if (child?.pid) {
+    // Do not block Electron's main thread while Windows tears down the TUN
+    // adapter. The process is detached from the UI state immediately.
+    try { child.kill(); } catch { /* process may already be gone */ }
+    try { spawn('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }).unref(); } catch { /* process may already be gone */ }
+  }
+  vlessProcess = null;
+  const state = { ...readState(), vlessActive: false };
+  if (!silent) { writeState(state); pushLog('VLESS-маршрутизация остановлена.'); }
+  return state;
+}
+function runChecked(executable, args, { timeoutMs = 7000 } = {}) {
+  return new Promise((resolve) => {
+    let output = ''; let done = false; let timer;
+    const finish = (result) => { if (!done) { done = true; clearTimeout(timer); resolve(result); } };
+    let child;
+    try {
+      child = spawn(executable, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+      child.stdout.on('data', (chunk) => { output += String(chunk); });
+      child.stderr.on('data', (chunk) => { output += String(chunk); });
+      child.once('error', (error) => finish({ ok: false, output: error.message }));
+      child.once('exit', (code) => finish({ ok: code === 0, output }));
+    } catch (error) { finish({ ok: false, output: error.message }); }
+    timer = setTimeout(() => { try { child?.kill(); } catch {} finish({ ok: false, output: 'Превышено время проверки конфигурации.' }); }, timeoutMs);
+  });
+}
+async function discoverDesktopApps() {
+  if (process.platform !== 'win32') return [];
+  const script = "$paths=@(Join-Path $env:APPDATA 'Microsoft\\Windows\\Start Menu\\Programs'),(Join-Path $env:ProgramData 'Microsoft\\Windows\\Start Menu\\Programs');$w=New-Object -ComObject WScript.Shell;$items=Get-ChildItem -Path $paths -Filter *.lnk -Recurse -ErrorAction SilentlyContinue|ForEach-Object {$t=$w.CreateShortcut($_.FullName).TargetPath;if($t -match '\\.exe$'){[pscustomobject]@{name=$_.BaseName;process=[IO.Path]::GetFileName($t)}}}|Sort-Object name -Unique|Select-Object -First 80;$items|ConvertTo-Json -Compress";
+  const result = await runChecked('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { timeoutMs: 9000 });
+  if (!result.ok || !result.output.trim()) return [];
+  try {
+    const parsed = JSON.parse(result.output);
+    return (Array.isArray(parsed) ? parsed : [parsed])
+      .filter((item) => item && typeof item.name === 'string' && /^[a-z0-9][a-z0-9._ -]{0,120}\.exe$/i.test(item.process || ''));
+  } catch { return []; }
+}
+async function startVless() {
+  const state = readState();
+  if (vlessIsRunning()) return { ok: true, state };
+  if (!state.vlessConfigured) return { ok: false, message: 'Сначала добавьте VLESS-ссылку.' };
+  const executable = singBoxExecutable();
+  if (!fs.existsSync(executable)) return { ok: false, message: 'VLESS-движок sing-box не найден в сборке.' };
+  const uri = decodeVlessUri(state);
+  if (!uri) return { ok: false, message: 'Не удалось расшифровать VLESS-профиль. Добавьте ссылку заново.' };
+  fs.mkdirSync(path.dirname(vlessConfigPath()), { recursive: true });
+  let config;
+  try { config = createSingBoxConfig(uri, state.vless); } catch (error) { return { ok: false, message: `VLESS-профиль некорректен: ${error.message}` }; }
+  fs.writeFileSync(vlessConfigPath(), JSON.stringify(config, null, 2), 'utf8');
+  const check = await runChecked(executable, ['check', '-c', vlessConfigPath()]);
+  if (!check.ok) {
+    const detail = String(check.output || '').trim().split(/\r?\n/).pop();
+    return { ok: false, message: `VLESS-конфигурация не прошла проверку${detail ? `: ${detail}` : '.'}` };
+  }
+  const child = spawn(executable, ['run', '-c', vlessConfigPath()], { windowsHide: true, cwd: path.dirname(executable), stdio: ['ignore', 'pipe', 'pipe'] });
+  vlessProcess = child;
+  const writeOutput = (chunk) => String(chunk).split(/\r?\n/).map((line) => line.trim()).filter(Boolean).forEach((line) => pushLog(`[vless] ${line}`));
+  child.stdout?.on('data', writeOutput); child.stderr?.on('data', writeOutput);
+  child.once('error', (error) => { pushLog(`VLESS: ошибка запуска: ${error.message}`); if (vlessProcess === child) vlessProcess = null; });
+  child.once('exit', (code) => { if (!expectedStops.has(child) && code !== null) pushLog(`VLESS неожиданно завершился с кодом ${code}.`); if (vlessProcess === child) vlessProcess = null; });
+  const earlyExit = await waitForEarlyExit(child, 1300);
+  if (earlyExit) {
+    vlessProcess = null;
+    return { ok: false, message: 'VLESS-движок завершился при запуске. Откройте технический журнал.' };
+  }
+  const next = { ...state, vlessActive: true };
+  writeState(next); pushLog(state.vless.mode === 'all' ? 'VLESS включён: весь интернет направляется в туннель.' : `VLESS включён: ${state.vless.domains.length} доменов направляются в туннель.`);
+  return { ok: true, state: next };
+}
 function releaseSources() {
   const file = app.isPackaged ? path.join(process.resourcesPath, 'app', 'src', 'config', 'release-sources.json') : path.join(__dirname, 'config', 'release-sources.json');
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return {}; }
@@ -233,10 +318,14 @@ async function startEngine() {
 function readState() {
   try {
     const saved = JSON.parse(fs.readFileSync(stateFile(), 'utf8'));
-    return { ...defaults, ...saved, profile: createProfile(saved.profile) };
+    return { ...defaults, ...saved, profile: createProfile(saved.profile), vless: createVlessProfile(saved.vless) };
   } catch { return defaults; }
 }
 function writeState(next) { fs.writeFileSync(stateFile(), JSON.stringify(next, null, 2), 'utf8'); }
+function publicState(next) {
+  const { vlessSecret, ...safe } = next;
+  return { ...safe, active: engineIsRunning(), vlessActive: vlessIsRunning() };
+}
 function profilesTargetSame(left, right) {
   return left.services.join('\n') === right.services.join('\n') && left.domains.join('\n') === right.domains.join('\n');
 }
@@ -268,10 +357,12 @@ function readLogs() {
 }
 function diagnostics(state) {
   const localEngineRunning = engineIsRunning();
+  const localVlessRunning = vlessIsRunning();
   const externalWinwsPids = otherWinwsPids();
   const items = [
     { label: 'Профиль', value: state.profile.domains.length ? `${state.profile.domains.length} доменов выбрано` : 'Сервисы не выбраны', level: state.profile.domains.length ? 'ok' : 'warning' },
     { label: 'Сетевой движок', value: externalWinwsPids.length ? 'Обнаружен внешний winws — возможен конфликт' : (localEngineRunning ? 'Запущен Local Route' : (fs.existsSync(engineExecutable()) ? 'Готов к запуску' : 'Не найден в сборке')), level: externalWinwsPids.length ? 'warning' : (localEngineRunning ? 'ok' : 'neutral') },
+    { label: 'VLESS-маршрутизация', value: state.vlessConfigured ? (localVlessRunning ? (state.vless.mode === 'all' ? 'Весь интернет через туннель' : `${state.vless.domains.length} доменов через туннель`) : 'Профиль готов к запуску') : 'Не настроена', level: localVlessRunning ? 'ok' : (state.vlessConfigured ? 'neutral' : 'warning') },
     { label: 'Приватность', value: 'Трафик и диагностика остаются на устройстве', level: 'ok' }
   ];
   if (state.profile.services.includes('telegram')) {
@@ -304,7 +395,7 @@ function createTray() {
   tray.setToolTip('Local Route');
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Открыть Local Route', click: showMainWindow },
-    { label: 'Остановить локальную защиту', click: () => stopEngine() },
+    { label: 'Остановить всё', click: () => { stopEngine(); stopVless(); } },
     { type: 'separator' },
     { label: 'Выйти', click: () => app.quit() }
   ]));
@@ -364,6 +455,10 @@ app.whenReady().then(async () => {
       const result = await startEngine();
       if (!result.ok) pushLog(`Автозапуск не включил защиту: ${result.message}`);
     } else pushLog('Автозапуск пропущен: нет подтверждённой стратегии.');
+    if (state.autoStart && state.vlessConfigured) {
+      const result = await startVless();
+      if (!result.ok) pushLog(`Автозапуск не включил VLESS: ${result.message}`);
+    }
     // Do not compete with Windows sign-in. Once the desktop is usable, load
     // the renderer invisibly so opening from tray is instant.
     const warmup = setTimeout(() => { if (!mainWindow && !isQuitting) createWindow({ showOnReady: false }); }, 8000);
@@ -371,9 +466,9 @@ app.whenReady().then(async () => {
   }
   app.on('activate', showMainWindow);
 });
-app.on('before-quit', () => { isQuitting = true; if (activeOperation) activeOperation.cancelled = true; stopEngine(); });
+app.on('before-quit', () => { isQuitting = true; if (activeOperation) activeOperation.cancelled = true; stopEngine(); stopVless(); });
 
-ipcMain.handle('state:read', () => { const state = { ...readState(), active: engineIsRunning(), autoStart: cachedAutoStart }; return { ...state, diagnostics: diagnostics(state), logs: readLogs() }; });
+ipcMain.handle('state:read', () => { const state = { ...readState(), active: engineIsRunning(), autoStart: cachedAutoStart, vlessActive: vlessIsRunning() }; return { ...publicState(state), diagnostics: diagnostics(state), logs: readLogs() }; });
 ipcMain.handle('profile:save', (_event, raw) => {
   if (engineIsRunning()) stopEngine();
   const state = readState();
@@ -382,17 +477,18 @@ ipcMain.handle('profile:save', (_event, raw) => {
   // unchanged set of domains. Any route change still forces a fresh test.
   const next = { ...state, profile, active: false, verifiedStrategy: profilesTargetSame(state.profile, profile) ? state.verifiedStrategy : null };
   writeState(next);
-  return { ...next, diagnostics: diagnostics(next), plan: createEnginePlan(profile) };
+  return { ...publicState(next), diagnostics: diagnostics(next), plan: createEnginePlan(profile) };
 });
 ipcMain.handle('engine:toggle', async () => {
   if (activeOperation) return { ok: false, message: 'Сначала остановите или дождитесь завершения текущей проверки.' };
   const result = engineIsRunning() ? { ok: true, state: stopEngine() } : await startEngine();
   if (!result.ok) return result;
-  return { ok: true, state: { ...result.state, active: engineIsRunning(), diagnostics: diagnostics({ ...result.state, active: engineIsRunning() }), logs: engineLog } };
+  const state = { ...result.state, active: engineIsRunning() };
+  return { ok: true, state: { ...publicState(state), diagnostics: diagnostics(state), logs: engineLog } };
 });
 ipcMain.handle('engine:startVerified', async () => {
   if (activeOperation) return { ok: false, message: 'Сначала остановите или дождитесь завершения текущей проверки.' };
-  if (engineIsRunning()) return { ok: true, state: { ...readState(), active: true } };
+  if (engineIsRunning()) return { ok: true, state: publicState({ ...readState(), active: true }) };
   const state = readState();
   if (!state.verifiedStrategy) return { ok: false, message: 'Нет подтверждённой стратегии. Сначала выполните автоподбор.' };
   const next = { ...state, profile: createProfile({ ...state.profile, strategy: state.verifiedStrategy }), active: false };
@@ -401,12 +497,91 @@ ipcMain.handle('engine:startVerified', async () => {
   const result = await startEngine();
   if (!result.ok) return result;
   const running = { ...result.state, active: engineIsRunning() };
-  return { ok: true, state: { ...running, diagnostics: diagnostics(running), logs: readLogs() }, message: `Запущена подтверждённая стратегия: ${state.verifiedStrategy}.` };
+  return { ok: true, state: { ...publicState(running), diagnostics: diagnostics(running), logs: readLogs() }, message: `Запущена подтверждённая стратегия: ${state.verifiedStrategy}.` };
+});
+ipcMain.handle('network:startAll', async () => {
+  if (activeOperation) return { ok: false, message: 'Дождитесь завершения проверки Zapret.' };
+  const current = readState();
+  let engineResult = { ok: true, state: current }; let engineSkipped = false;
+  if (!engineIsRunning()) {
+    if (!current.verifiedStrategy) engineSkipped = true;
+    else {
+      const next = { ...current, profile: createProfile({ ...current.profile, strategy: current.verifiedStrategy }) };
+      writeState(next);
+      engineResult = await startEngine();
+      if (!engineResult.ok) return engineResult;
+    }
+  }
+  let vlessMessage = '';
+  if (current.vlessConfigured && !vlessIsRunning()) {
+    const vlessResult = await startVless();
+    if (!vlessResult.ok) return { ok: false, message: `Zapret запущен, но VLESS не включился: ${vlessResult.message}` };
+    vlessMessage = ' VLESS также включён.';
+  }
+  const state = { ...readState(), active: engineIsRunning(), vlessActive: vlessIsRunning() };
+  const message = engineSkipped
+    ? (vlessMessage ? 'VLESS включён. Zapret пока не запускался: сначала подтвердите стратегию на отдельной вкладке.' : 'Сначала подтвердите стратегию Zapret на отдельной вкладке.')
+    : `Защита запущена.${vlessMessage}`;
+  return { ok: true, state: { ...publicState(state), diagnostics: diagnostics(state), logs: readLogs() }, message };
+});
+ipcMain.handle('network:stopAll', () => {
+  if (activeOperation) activeOperation.cancelled = true;
+  stopEngine(); stopVless();
+  const state = { ...readState(), active: false, vlessActive: false };
+  return { ...publicState(state), diagnostics: diagnostics(state), logs: readLogs() };
 });
 ipcMain.handle('engine:stop', () => {
   if (activeOperation) activeOperation.cancelled = true;
   const state = stopEngine();
-  return { ...state, active: false, diagnostics: diagnostics(state), logs: readLogs() };
+  return { ...publicState(state), active: false, diagnostics: diagnostics(state), logs: readLogs() };
+});
+ipcMain.handle('vless:save', (_event, raw) => {
+  const state = readState();
+  try {
+    const uri = String(raw?.uri || '').trim() || decodeVlessUri(state);
+    if (!uri) return { ok: false, message: 'Вставьте VLESS-ссылку.' };
+    // Parse before persisting so an invalid secret never replaces a working one.
+    createSingBoxConfig(uri, raw);
+    const vless = createVlessProfile(raw);
+    const next = { ...state, vless, vlessConfigured: true, vlessSecret: encodeVlessUri(uri), vlessActive: vlessIsRunning() };
+    writeState(next);
+    pushLog(`VLESS-профиль сохранён: ${vless.domains.length} доменов выбрано.`);
+    return { ok: true, state: { ...publicState(next), diagnostics: diagnostics(next), logs: readLogs() }, message: 'VLESS-профиль сохранён в шифрованном хранилище Windows.' };
+  } catch (error) { return { ok: false, message: error.message || 'Не удалось сохранить VLESS-профиль.' }; }
+});
+ipcMain.handle('vless:toggle', async () => {
+  const result = vlessIsRunning() ? { ok: true, state: stopVless(), message: 'VLESS-маршрутизация остановлена.' } : await startVless();
+  if (!result.ok) return result;
+  const state = { ...result.state, active: engineIsRunning(), vlessActive: vlessIsRunning() };
+  return { ...result, state: { ...publicState(state), diagnostics: diagnostics(state), logs: readLogs() }, message: result.message || 'VLESS-маршрутизация включена.' };
+});
+ipcMain.handle('vless:start', async () => {
+  const result = vlessIsRunning() ? { ok: true, state: readState(), message: 'VLESS уже включён.' } : await startVless();
+  if (!result.ok) return result;
+  const state = { ...result.state, active: engineIsRunning(), vlessActive: vlessIsRunning() };
+  return { ...result, state: { ...publicState(state), diagnostics: diagnostics(state), logs: readLogs() }, message: result.message || 'VLESS включён.' };
+});
+ipcMain.handle('vless:apps', async () => {
+  const apps = await discoverDesktopApps();
+  return { ok: true, apps };
+});
+ipcMain.handle('vless:test', async () => {
+  if (activeOperation) return { ok: false, message: 'Дождитесь завершения другой проверки.' };
+  const operation = beginOperation('vless-test');
+  try {
+    const current = readState();
+    if (!current.vlessConfigured) return { ok: false, message: 'Сначала сохраните VLESS-профиль.' };
+    const target = vlessProbe(current.vless);
+    if (!target) return { ok: false, message: 'Выберите сервис для VLESS или включите режим «Весь интернет».' };
+    const wasRunning = vlessIsRunning();
+    const started = wasRunning ? { ok: true } : await startVless();
+    if (!started.ok) return started;
+    const result = await probe(target.url, { timeoutMs: 8000 });
+    pushLog(`${target.label} через VLESS: ${result.success ? 'успешно' : 'ошибка'} — ${result.detail}, ${result.durationMs} мс.`);
+    if (!wasRunning) stopVless({ silent: true });
+    const state = { ...readState(), active: engineIsRunning(), vlessActive: vlessIsRunning() };
+    return { ok: result.success, result: { ...target, ...result }, state: { ...publicState(state), diagnostics: diagnostics(state), logs: readLogs() }, message: result.success ? `VLESS-маршрут «${target.label}» работает.` : `VLESS-маршрут «${target.label}» не ответил: ${result.detail}.` };
+  } finally { finishOperation(operation); }
 });
 ipcMain.handle('engine:testStrategy', async (_event, strategy) => {
   if (!STRATEGY_IDS.has(strategy) || strategy === 'auto') return { ok: false, message: 'Неизвестная стратегия.' };
@@ -475,7 +650,7 @@ ipcMain.handle('engine:autoSelect', async () => {
           const next = { ...readState(), profile, active: true, verifiedStrategy: strategy };
           writeState(next); pushLog(`Автоподбор выбрал стратегию: ${strategy}.`);
           keepEngine = true;
-          return { ok: true, state: { ...next, diagnostics: diagnostics(next), logs: engineLog }, message: `Подобрана стратегия: ${strategy}.` };
+          return { ok: true, state: { ...publicState(next), diagnostics: diagnostics(next), logs: engineLog }, message: `Подобрана стратегия: ${strategy}.` };
         }
       } finally {
         if (!keepEngine) stopEngine({ silent: true, recover: false });
@@ -497,6 +672,6 @@ ipcMain.handle('autostart:set', (_event, enabled) => {
   const result = configureAutoStart(Boolean(enabled));
   if (!result.ok) return result;
   const state = { ...result.state, active: engineIsRunning(), autoStart: cachedAutoStart };
-  return { ...result, state: { ...state, diagnostics: diagnostics(state), logs: readLogs() } };
+  return { ...result, state: { ...publicState(state), diagnostics: diagnostics(state), logs: readLogs() } };
 });
 ipcMain.handle('external:open', (_event, url) => shell.openExternal(url));

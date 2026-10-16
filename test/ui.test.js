@@ -3,16 +3,18 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-test('automatic strategy selection is visible on both application pages', () => {
+test('Zapret auto-selection stays on its dedicated strategy page', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
-  assert.equal((html.match(/data-auto-select/g) || []).length, 2);
-  assert.match(html, /Автоподбор и запуск/);
+  assert.equal((html.match(/data-auto-select/g) || []).length, 1);
+  assert.match(html, /Проверка стратегий/);
   assert.match(html, /Автоподбор всех стратегий/);
 });
 
-test('both pages expose an emergency stop control', () => {
+test('management exposes a single all-network start and stop control', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
-  assert.equal((html.match(/stop-engine/g) || []).length, 2);
+  assert.match(html, /id="start-all"/);
+  assert.match(html, /id="stop-all"/);
+  assert.equal((html.match(/stop-engine/g) || []).length, 1);
 });
 
 test('strategy results have one destination and raw logs are separated', () => {
@@ -24,6 +26,7 @@ test('strategy results have one destination and raw logs are separated', () => {
 
 test('window behavior includes a visible Windows title bar and keeps its renderer warm in tray', () => {
   const main = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  const routing = fs.readFileSync(path.join(__dirname, '..', 'src', 'core', 'vless.js'), 'utf8');
   assert.match(main, /new Tray/);
   assert.match(main, /Открыть Local Route/);
   assert.match(main, /mainWindow\.hide\(\)/);
@@ -64,14 +67,14 @@ test('autostart can be controlled from the management page and starts hidden', (
   assert.match(main, /state\.verifiedStrategy/);
 });
 
-test('the interface offers a direct launch of the last confirmed strategy', () => {
+test('management starts saved Zapret and VLESS together', () => {
   const root = path.join(__dirname, '..');
   const html = fs.readFileSync(path.join(root, 'src', 'renderer', 'index.html'), 'utf8');
   const renderer = fs.readFileSync(path.join(root, 'src', 'renderer', 'app.js'), 'utf8');
   const main = fs.readFileSync(path.join(root, 'src', 'main.js'), 'utf8');
-  assert.match(html, /id="start-verified"/);
-  assert.match(renderer, /startVerified\(\)/);
-  assert.match(main, /engine:startVerified/);
+  assert.match(html, /id="start-all"/);
+  assert.match(renderer, /startAll\(\)/);
+  assert.match(main, /network:startAll/);
 });
 
 test('release and source links are compactly available in the sidebar', () => {
@@ -80,15 +83,18 @@ test('release and source links are compactly available in the sidebar', () => {
   const renderer = fs.readFileSync(path.join(root, 'src', 'renderer', 'app.js'), 'utf8');
   const sources = JSON.parse(fs.readFileSync(path.join(root, 'src', 'config', 'release-sources.json'), 'utf8'));
   assert.match(html, /id="open-release-channel"/);
+  assert.match(html, /id="open-max-channel"/);
   assert.match(html, /id="open-repository"/);
   assert.match(renderer, /https:\/\/t\.me\/TheLocalRoute/);
+  assert.match(renderer, /https:\/\/max\.ru\/channel_LocalRoute/);
   assert.equal(sources.telegramChannel, 'https://t.me/TheLocalRoute');
+  assert.equal(sources.maxChannel, 'https://max.ru/channel_LocalRoute');
 });
 
-test('protection actions stay together instead of becoming independent grid cells', () => {
+test('protection actions fit as four equal controls', () => {
   const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'styles.css'), 'utf8');
   assert.match(css, /\.connection-actions \{ display: grid;/);
-  assert.match(css, /\.connection-actions \.danger-button \{ grid-column: 1 \/ -1;/);
+  assert.match(css, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(css, /\.startup-panel \{ grid-column: 1 \/ -1;/);
 });
 
@@ -109,6 +115,24 @@ test('strategy testing exposes the complete upstream catalogue and a loading ind
   assert.match(html, /id="operation-progress"/);
   assert.match(renderer, /UPSTREAM_STRATEGY_IDS/);
   assert.match(renderer, /setOperationBusy/);
+});
+
+test('VLESS routes offer selective and whole-internet modes without sending secrets to the renderer', () => {
+  const main = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  const routing = fs.readFileSync(path.join(__dirname, '..', 'src', 'core', 'vless.js'), 'utf8');
+  const preload = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
+  const renderer = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  assert.match(main, /safeStorage\.encryptString/);
+  assert.match(main, /function publicState/);
+  assert.match(routing, /selective \? 'direct' : 'vless-out'/);
+  assert.match(preload, /saveVless/);
+  assert.match(preload, /testVless/);
+  assert.match(preload, /discoverVlessApps/);
+  assert.match(renderer, /Маршруты VLESS/);
+  assert.match(renderer, /Весь интернет через VLESS/);
+  assert.match(renderer, /Найти на компьютере/);
+  assert.doesNotMatch(preload, /vlessSecret/);
+  assert.doesNotMatch(renderer, /vlessSecret/);
 });
 
 test('automatic selection uses staged, low-concurrency probes before a full check', () => {

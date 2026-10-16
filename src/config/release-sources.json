@@ -1,5 +1,6 @@
 {
   "manifestUrl": null,
   "telegramChannel": "https://t.me/TheLocalRoute",
+  "maxChannel": "https://max.ru/channel_LocalRoute",
   "fallbackRepository": "https://github.com/iKokTot/local-route"
 }
