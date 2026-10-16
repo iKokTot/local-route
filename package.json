@@ -1,6 +1,6 @@
 {
   "name": "local-route",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "private": true,
   "description": "Local-first Windows companion for managing DPI-bypass profiles.",
   "main": "src/main.js",

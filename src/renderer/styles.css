@@ -97,6 +97,9 @@ button:disabled { cursor: wait; opacity: .65; }
 .protection-label, .protection-copy span { display: block; color: var(--muted); font-size: 12px; }
 .protection-title, .protection-copy strong { display: block; margin-top: 1px; font-size: 16px; font-weight: 800; }
 .protection-copy small { display: block; margin-top: 3px; color: var(--muted); }
+.run-states { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.run-states span { padding: 4px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 11px; font-weight: 800; }
+.run-states span.active { border-color: #4d9e73; color: var(--accent); background: var(--accent-soft); }
 .connection-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; align-items: stretch; }
 .connection-actions .danger-button { grid-column: auto; }
 .connection-actions .button, .connection-actions .danger-button { white-space: nowrap; }

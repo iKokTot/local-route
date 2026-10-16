@@ -63,7 +63,7 @@
         <div class="protection-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3Zm-3 9 2 2 4-4"/></svg>
         </div>
-        <div class="protection-copy"><span>Локальная защита</span><strong id="protection-title">Выберите сервисы и запустите подбор</strong><small id="protection-description">Подбор проверит доступность и оставит включённой подходящую стратегию.</small></div>
+        <div class="protection-copy"><span>Локальная защита</span><strong id="protection-title">Выберите сервисы и запустите подбор</strong><small id="protection-description">Подбор проверит доступность и оставит включённой подходящую стратегию.</small><div class="run-states"><span id="dpi-run-state">DPI · не запущен</span><span id="vless-run-state">VLESS · не запущен</span></div></div>
         <div class="connection-actions">
           <button class="button primary" id="start-all"><span class="button-icon">▶</span> Запустить всё</button>
           <button class="button secondary" id="start-vless"><span class="button-icon">◉</span> VLESS</button>
@@ -147,9 +147,12 @@
             <div class="add-domain"><input id="vless-custom-domain" placeholder="например, example.com"><button id="add-vless-domain" aria-label="Добавить домен в VLESS">+</button></div>
             </label>
             <div class="chips" id="vless-custom-domains"></div>
-            <div class="apps-heading"><strong>Приложения через VLESS</strong><button class="text-button" id="discover-vless-apps">Найти на компьютере</button></div>
-            <p class="setting-description">Выбранные .exe направляются через туннель независимо от домена.</p>
-            <div id="vless-app-list" class="app-list"><span class="muted">Нажмите «Найти на компьютере», чтобы показать ярлыки приложений.</span></div>
+            <div class="apps-heading"><strong>Приложения через VLESS</strong><span class="counter">библиотека</span></div>
+            <p class="setting-description">Выбранные приложения направляются через туннель независимо от домена. Для браузера через VLESS пойдёт весь его трафик.</p>
+            <div id="vless-app-list" class="app-list"></div>
+            <label class="custom-label">Добавить приложение вручную <span>имя файла .exe</span>
+              <div class="add-domain"><input id="manual-vless-app" placeholder="например, my-app.exe"><button id="add-vless-app" aria-label="Добавить приложение в VLESS">+</button></div>
+            </label>
           </div>
         </div>
         <aside class="side">

@@ -13,7 +13,6 @@ contextBridge.exposeInMainWorld('localRoute', {
   toggleVless: () => ipcRenderer.invoke('vless:toggle'),
   startVless: () => ipcRenderer.invoke('vless:start'),
   testVless: () => ipcRenderer.invoke('vless:test'),
-  discoverVlessApps: () => ipcRenderer.invoke('vless:apps'),
   startAll: () => ipcRenderer.invoke('network:startAll'),
   stopAll: () => ipcRenderer.invoke('network:stopAll'),
   open: (url) => ipcRenderer.invoke('external:open', url)

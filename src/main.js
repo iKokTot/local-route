@@ -94,17 +94,6 @@ function runChecked(executable, args, { timeoutMs = 7000 } = {}) {
     timer = setTimeout(() => { try { child?.kill(); } catch {} finish({ ok: false, output: 'Превышено время проверки конфигурации.' }); }, timeoutMs);
   });
 }
-async function discoverDesktopApps() {
-  if (process.platform !== 'win32') return [];
-  const script = "$paths=@(Join-Path $env:APPDATA 'Microsoft\\Windows\\Start Menu\\Programs'),(Join-Path $env:ProgramData 'Microsoft\\Windows\\Start Menu\\Programs');$w=New-Object -ComObject WScript.Shell;$items=Get-ChildItem -Path $paths -Filter *.lnk -Recurse -ErrorAction SilentlyContinue|ForEach-Object {$t=$w.CreateShortcut($_.FullName).TargetPath;if($t -match '\\.exe$'){[pscustomobject]@{name=$_.BaseName;process=[IO.Path]::GetFileName($t)}}}|Sort-Object name -Unique|Select-Object -First 80;$items|ConvertTo-Json -Compress";
-  const result = await runChecked('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { timeoutMs: 9000 });
-  if (!result.ok || !result.output.trim()) return [];
-  try {
-    const parsed = JSON.parse(result.output);
-    return (Array.isArray(parsed) ? parsed : [parsed])
-      .filter((item) => item && typeof item.name === 'string' && /^[a-z0-9][a-z0-9._ -]{0,120}\.exe$/i.test(item.process || ''));
-  } catch { return []; }
-}
 async function startVless() {
   const state = readState();
   if (vlessIsRunning()) return { ok: true, state };
@@ -560,10 +549,6 @@ ipcMain.handle('vless:start', async () => {
   if (!result.ok) return result;
   const state = { ...result.state, active: engineIsRunning(), vlessActive: vlessIsRunning() };
   return { ...result, state: { ...publicState(state), diagnostics: diagnostics(state), logs: readLogs() }, message: result.message || 'VLESS включён.' };
-});
-ipcMain.handle('vless:apps', async () => {
-  const apps = await discoverDesktopApps();
-  return { ok: true, apps };
 });
 ipcMain.handle('vless:test', async () => {
   if (activeOperation) return { ok: false, message: 'Дождитесь завершения другой проверки.' };

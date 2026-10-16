@@ -122,15 +122,16 @@ test('VLESS routes offer selective and whole-internet modes without sending secr
   const routing = fs.readFileSync(path.join(__dirname, '..', 'src', 'core', 'vless.js'), 'utf8');
   const preload = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
   const renderer = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
   assert.match(main, /safeStorage\.encryptString/);
   assert.match(main, /function publicState/);
   assert.match(routing, /selective \? 'direct' : 'vless-out'/);
   assert.match(preload, /saveVless/);
   assert.match(preload, /testVless/);
-  assert.match(preload, /discoverVlessApps/);
   assert.match(renderer, /Маршруты VLESS/);
   assert.match(renderer, /Весь интернет через VLESS/);
-  assert.match(renderer, /Найти на компьютере/);
+  assert.match(appJs, /VLESS_APP_LIBRARY/);
+  assert.match(renderer, /Добавить приложение вручную/);
   assert.doesNotMatch(preload, /vlessSecret/);
   assert.doesNotMatch(renderer, /vlessSecret/);
 });

@@ -1,12 +1,22 @@
 const SERVICES = { youtube: 'YouTube', discord: 'Discord' };
 const VLESS_SERVICES = { tiktok: 'TikTok', instagram: 'Instagram', x: 'X / Twitter', chatgpt: 'ChatGPT' };
+const VLESS_APP_LIBRARY = [
+  { name: 'Telegram Desktop', process: 'Telegram.exe' }, { name: 'Discord', process: 'Discord.exe' },
+  { name: 'WhatsApp', process: 'WhatsApp.exe' }, { name: 'ChatGPT', process: 'ChatGPT.exe' },
+  { name: 'Google Chrome', process: 'chrome.exe' }, { name: 'Microsoft Edge', process: 'msedge.exe' },
+  { name: 'Firefox', process: 'firefox.exe' }, { name: 'Brave', process: 'brave.exe' },
+  { name: 'Opera', process: 'opera.exe' }, { name: 'Яндекс Браузер', process: 'browser.exe' },
+  { name: 'Steam', process: 'steam.exe' }, { name: 'Epic Games Launcher', process: 'EpicGamesLauncher.exe' },
+  { name: 'Battle.net', process: 'Battle.net.exe' }, { name: 'Spotify', process: 'Spotify.exe' },
+  { name: 'CapCut', process: 'CapCut.exe' }, { name: 'TikTok', process: 'TikTok.exe' }
+];
 const STRATEGY_LABELS = {
   zapretAlt: 'Zapret ALT', zapretAlt2: 'Zapret ALT2', zapretAlt3: 'Zapret ALT3', zapretAlt4: 'Zapret ALT4', zapretAlt5: 'Zapret ALT5', zapretAlt6: 'Zapret ALT6', zapretAlt7: 'Zapret ALT7', zapretAlt8: 'Zapret ALT8', zapretAlt9: 'Zapret ALT9', zapretAlt10: 'Zapret ALT10', zapretAlt11: 'Zapret ALT11', zapretAlt12: 'Zapret ALT12', zapretAlt13: 'Zapret ALT13',
   zapretFakeTlsAuto: 'FAKE TLS AUTO', zapretFakeTlsAutoAlt: 'FAKE TLS AUTO ALT', zapretFakeTlsAutoAlt2: 'FAKE TLS AUTO ALT2', zapretFakeTlsAutoAlt3: 'FAKE TLS AUTO ALT3', zapretSimpleFake: 'SIMPLE FAKE', zapretSimpleFakeAlt: 'SIMPLE FAKE ALT', zapretSimpleFakeAlt2: 'SIMPLE FAKE ALT2', zapretExp: 'Zapret EXP', zapretBase: 'Zapret Standard',
   alt12: 'Упрощённый ALT12', balanced: 'Сбалансированная', compatibility: 'Совместимость', split2: 'Split ×2', fakeSplit: 'Fake Split', fakeTls: 'Fake TLS'
 };
 const UPSTREAM_STRATEGY_IDS = Object.keys(STRATEGY_LABELS).filter((id) => id.startsWith('zapret'));
-let state; let customDomains = []; let vlessCustomDomains = []; let vlessApps = []; let operationBusy = false; let vlessBusy = false; let toastTimer;
+let state; let customDomains = []; let vlessCustomDomains = []; let vlessManualApps = []; let operationBusy = false; let vlessBusy = false; let toastTimer;
 const $ = (selector) => document.querySelector(selector);
 const toast = (message) => { const node = $('#toast'); clearTimeout(toastTimer); node.textContent = message; node.classList.add('show'); toastTimer = setTimeout(() => node.classList.remove('show'), 3300); };
 const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
@@ -25,7 +35,7 @@ function setVlessBusy(busy, message = 'Подготавливаю VLESS в фо�
   document.body.classList.toggle('vless-busy', busy);
   const progress = $('#vless-progress');
   if (progress) { progress.classList.toggle('hidden', !busy); progress.querySelector('span').textContent = message; }
-  document.querySelectorAll('#save-vless, #toggle-vless, #test-vless, #vless-mode, .vless-service, .vless-app, #add-vless-domain, #discover-vless-apps').forEach((button) => { button.disabled = busy; });
+  document.querySelectorAll('#save-vless, #toggle-vless, #test-vless, #vless-mode, .vless-service, .vless-app, #add-vless-domain, #add-vless-app').forEach((button) => { button.disabled = busy; });
 }
 function render() {
   const selected = new Set(state.profile.services);
@@ -36,10 +46,8 @@ function render() {
   $('#vless-service-list').innerHTML = Object.entries(VLESS_SERVICES).map(([key, label]) => `<label class="service"><input class="vless-service" type="checkbox" value="${key}" ${vlessSelected.has(key) ? 'checked' : ''}><span>${label}</span></label>`).join('');
   $('#vless-custom-domains').innerHTML = vlessCustomDomains.map((domain, index) => `<span class="chip">${domain}<button data-vless-remove="${index}" title="Удалить">×</button></span>`).join('');
   const selectedApps = new Set(state.vless?.apps || []);
-  const knownApps = [...vlessApps, ...(state.vless?.apps || []).filter((process) => !vlessApps.some((app) => app.process === process)).map((process) => ({ name: process, process }))];
-  $('#vless-app-list').innerHTML = knownApps.length
-    ? knownApps.map((app) => `<label class="service"><input class="vless-app" type="checkbox" value="${escapeHtml(app.process)}" ${selectedApps.has(app.process) ? 'checked' : ''}><span>${escapeHtml(app.name)}<br><small>${escapeHtml(app.process)}</small></span></label>`).join('')
-    : '<span class="muted">Нажмите «Найти на компьютере», чтобы показать ярлыки приложений.</span>';
+  const knownApps = [...VLESS_APP_LIBRARY, ...vlessManualApps, ...(state.vless?.apps || []).filter((process) => ![...VLESS_APP_LIBRARY, ...vlessManualApps].some((app) => app.process.toLowerCase() === process.toLowerCase())).map((process) => ({ name: process, process }))];
+  $('#vless-app-list').innerHTML = knownApps.map((app) => `<label class="service"><input class="vless-app" type="checkbox" value="${escapeHtml(app.process)}" ${selectedApps.has(app.process) ? 'checked' : ''}><span>${escapeHtml(app.name)}<br><small>${escapeHtml(app.process)}</small></span></label>`).join('');
   $('#vless-domain-count').textContent = `${state.vless?.domains?.length || 0} доменов`;
   $('#vless-mode').value = state.vless?.mode || 'selective';
   $('#vless-selective-settings').classList.toggle('hidden', state.vless?.mode === 'all');
@@ -51,12 +59,17 @@ function render() {
     ? 'Весь внешний трафик идёт через VLESS. Локальная сеть остаётся прямой.'
     : 'Авито, WB, Ozon, VK, банки, локальная сеть и все невыбранные сайты не используют сервер.';
   $('#domain-count').textContent = `${state.profile.domains.length} доменов`;
-  $('#engine-status').textContent = state.active ? `Включена · ${STRATEGY_LABELS[state.profile.strategy] || state.profile.strategy}` : 'Готово к подбору';
-  $('#protection-title').textContent = state.active ? `Стратегия «${STRATEGY_LABELS[state.profile.strategy] || state.profile.strategy}» работает` : 'Выберите сервисы и запустите подбор';
-  $('#protection-description').textContent = state.active
-    ? 'Защита остаётся включённой до остановки вручную.'
-    : (state.verifiedStrategy ? `Есть подтверждённая стратегия: «${STRATEGY_LABELS[state.verifiedStrategy] || state.verifiedStrategy}».` : 'Подбор проверит доступность и оставит включённой подходящую стратегию.');
-  $('#status-dot').classList.toggle('active', state.active);
+  const runningCount = Number(state.active) + Number(state.vlessActive);
+  $('#engine-status').textContent = runningCount === 2 ? 'DPI и VLESS включены' : (state.active ? `DPI включён · ${STRATEGY_LABELS[state.profile.strategy] || state.profile.strategy}` : (state.vlessActive ? 'VLESS включён' : 'Готово к запуску'));
+  $('#protection-title').textContent = runningCount === 2 ? 'DPI и VLESS работают' : (state.active ? `DPI работает: «${STRATEGY_LABELS[state.profile.strategy] || state.profile.strategy}»` : (state.vlessActive ? 'VLESS-маршрутизация работает' : 'Защита не запущена'));
+  $('#protection-description').textContent = runningCount
+    ? 'Подключение активно. Остановить компоненты можно одной кнопкой.'
+    : (state.verifiedStrategy ? `Есть подтверждённая DPI-стратегия: «${STRATEGY_LABELS[state.verifiedStrategy] || state.verifiedStrategy}».` : 'Сначала подтвердите стратегию DPI на вкладке проверки.');
+  $('#dpi-run-state').textContent = state.active ? `DPI · включён (${STRATEGY_LABELS[state.profile.strategy] || state.profile.strategy})` : 'DPI · не запущен';
+  $('#vless-run-state').textContent = state.vlessActive ? `VLESS · включён (${state.vless.mode === 'all' ? 'весь интернет' : 'выбранные маршруты'})` : (state.vlessConfigured ? 'VLESS · готов к запуску' : 'VLESS · не настроен');
+  $('#dpi-run-state').className = state.active ? 'active' : '';
+  $('#vless-run-state').className = state.vlessActive ? 'active' : '';
+  $('#status-dot').classList.toggle('active', Boolean(runningCount));
   $('#autostart-toggle').checked = Boolean(state.autoStart);
   $('#autostart-description').textContent = state.autoStart
     ? (state.verifiedStrategy ? `Включён · стратегия «${STRATEGY_LABELS[state.verifiedStrategy] || state.verifiedStrategy}»` : 'Включён, но после изменения профиля нужен новый автоподбор.')
@@ -88,6 +101,7 @@ document.addEventListener('click', async (event) => {
   if (event.target.id === 'add-domain') { const input = $('#custom-domain'); const value = input.value.trim(); if (!value) return; customDomains = [...new Set([...customDomains, value])]; input.value = ''; await save(); }
   if (event.target.dataset.remove !== undefined) { customDomains.splice(Number(event.target.dataset.remove), 1); await save(); }
   if (event.target.id === 'add-vless-domain') { const input = $('#vless-custom-domain'); const value = input.value.trim(); if (!value) return; vlessCustomDomains = [...new Set([...vlessCustomDomains, value])]; input.value = ''; render(); }
+  if (event.target.id === 'add-vless-app') { const input = $('#manual-vless-app'); const value = input.value.trim(); if (!/^[a-z0-9][a-z0-9._ -]{0,120}\.exe$/i.test(value)) return toast('Введите имя исполняемого файла, например my-app.exe.'); vlessManualApps = [...vlessManualApps, { name: value, process: value }]; input.value = ''; render(); toast('Приложение добавлено в список. Сохраните VLESS-профиль.'); }
   if (event.target.dataset.vlessRemove !== undefined) { vlessCustomDomains.splice(Number(event.target.dataset.vlessRemove), 1); render(); }
   if (event.target.id === 'save-vless') {
     if (vlessBusy) return;
@@ -112,14 +126,6 @@ document.addEventListener('click', async (event) => {
     setVlessBusy(false);
     if (result.state) { state = result.state; vlessCustomDomains = state.vless.customDomains; render(); }
     toast(result.message);
-  }
-  if (event.target.id === 'discover-vless-apps') {
-    if (vlessBusy) return;
-    setVlessBusy(true, 'Ищу приложения по ярлыкам Windows…');
-    const result = await window.localRoute.discoverVlessApps();
-    vlessApps = result.apps || [];
-    setVlessBusy(false); render();
-    toast(vlessApps.length ? `Найдено приложений: ${vlessApps.length}. Выберите нужные и сохраните профиль.` : 'Ярлыки приложений не найдены. Можно использовать режим «Весь интернет».');
   }
   if (event.target.id === 'start-all') {
     if (operationBusy || vlessBusy) return;
