@@ -71,6 +71,8 @@ function createSingBoxConfig(uri, rawProfile) {
       default_domain_resolver: 'local-dns',
       rules: [
         { protocol: 'dns', action: 'hijack-dns' },
+        // TGWs is an independent direct connection, including full-tunnel mode.
+        { process_name: ['local-route-tg.exe'], outbound: 'direct' },
         ...(selective && profile.domains.length ? [{ domain_suffix: profile.domains, outbound: 'vless-out' }] : []),
         ...(selective && profile.apps.length ? [{ process_name: profile.apps, outbound: 'vless-out' }] : []),
         { ip_is_private: true, outbound: 'direct' }

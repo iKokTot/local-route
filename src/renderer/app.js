@@ -38,6 +38,18 @@ function setVlessBusy(busy, message = 'Подготавливаю VLESS в фо�
   document.querySelectorAll('#save-vless, #toggle-vless, #test-vless, #vless-mode, .vless-service, .vless-app, #add-vless-domain, #add-vless-app').forEach((button) => { button.disabled = busy; });
 }
 function render() {
+  $('#telegram-state').textContent = state.telegramBusy ? 'Запускается…' : (state.telegramActive ? 'Локальный порт готов' : (state.telegramError ? 'Ошибка' : 'Выключен'));
+  $('#telegram-error').textContent = state.telegramError || '';
+  $('#telegram-port').value = state.telegram?.port || 1443;
+  $('#telegram-enabled').checked = Boolean(state.telegram?.enabled);
+  let telegramChip = $('#telegram-run-state');
+  if (!telegramChip) {
+    telegramChip = document.createElement('span');
+    telegramChip.id = 'telegram-run-state';
+    $('#dpi-run-state').parentElement.appendChild(telegramChip);
+  }
+  telegramChip.textContent = state.telegramActive ? 'Telegram · прокси готов' : (state.telegramError ? 'Telegram · ошибка' : 'Telegram · выключен');
+  telegramChip.className = state.telegramActive ? 'active' : '';
   const selected = new Set(state.profile.services);
   $('#service-list').innerHTML = Object.entries(SERVICES).map(([key, label]) => `<label class="service"><input type="checkbox" value="${key}" ${selected.has(key) ? 'checked' : ''}><span>${label}</span></label>`).join('');
   $('#strategy-tests').innerHTML = UPSTREAM_STRATEGY_IDS.map((id) => `<button class="button secondary test-strategy" data-strategy="${id}">${STRATEGY_LABELS[id]}</button>`).join('');
@@ -76,13 +88,16 @@ function render() {
     : (state.verifiedStrategy ? 'При входе в Windows запустит подтверждённую стратегию и останется в трее.' : 'Сначала выполните автоподбор, затем автозапуск можно включить.');
   const verifiedLabel = STRATEGY_LABELS[state.verifiedStrategy] || state.verifiedStrategy;
   const canStartVerified = Boolean(state.verifiedStrategy && !state.active);
-  $('#start-verified').classList.toggle('hidden', !canStartVerified);
-  $('#start-verified').textContent = `▶ Запустить прошлую: «${verifiedLabel}»`;
+  const verifiedButton = $('#start-verified');
+  if (verifiedButton) {
+    verifiedButton.classList.toggle('hidden', !canStartVerified);
+    verifiedButton.textContent = `▶ Запустить прошлую: «${verifiedLabel}»`;
+  }
   document.querySelectorAll('[data-auto-select][data-save-profile]').forEach((button) => { button.textContent = state.active ? 'Подобрать заново' : (state.verifiedStrategy ? 'Подобрать заново' : 'Автоподбор и запуск'); });
   $('#diagnostics').innerHTML = state.diagnostics.map((item) => `<div class="diag ${item.level}"><div class="diag-label"><i></i>${item.label}</div><div class="diag-value">${item.value}</div></div>`).join('');
   const logs = state.logs || [];
   const activity = logs.filter((entry) => !entry.includes('[winws]') && !entry.includes('[vless]') && !/(YouTube|Discord (API|Gateway|CDN|Updates)):/i.test(entry));
-  const technical = logs.filter((entry) => entry.includes('[winws]') || entry.includes('[vless]'));
+  const technical = logs.filter((entry) => entry.includes('[winws]') || entry.includes('[vless]') || entry.includes('[tgws]'));
   $('#activity-log').innerHTML = activity.length
     ? activity.slice(0, 6).map((entry) => `<div class="activity-item">${escapeHtml(entry)}</div>`).join('')
     : '<span class="muted">Нет событий управления.</span>';
@@ -92,11 +107,30 @@ function draft() { return { services: [...document.querySelectorAll('#service-li
 function vlessDraft() { return { uri: $('#vless-uri').value.trim(), mode: $('#vless-mode').value, services: [...document.querySelectorAll('.vless-service:checked')].map((input) => input.value), apps: [...document.querySelectorAll('.vless-app:checked')].map((input) => input.value), customDomains: vlessCustomDomains }; }
 async function save() { state = await window.localRoute.saveProfile(draft()); customDomains = state.profile.customDomains; render(); toast('Профиль сохранён локально.'); }
 document.addEventListener('click', async (event) => {
+  const telegramAction = event.target.closest('button[id^="telegram-"]');
+  if (telegramAction) {
+    const buttons = [...document.querySelectorAll('button[id^="telegram-"]')];
+    buttons.forEach((button) => { button.disabled = true; });
+    $('#telegram-state').textContent = 'Выполняется…';
+    try {
+      const id = telegramAction.id;
+      const result = id === 'telegram-save' ? await window.localRoute.saveTelegram({ port: Number($('#telegram-port').value), enabled: $('#telegram-enabled').checked })
+        : id === 'telegram-start' ? await window.localRoute.startTelegram()
+          : id === 'telegram-stop' ? await window.localRoute.stopTelegram() : id === 'telegram-copy' ? await window.localRoute.copyTelegram() : await window.localRoute.connectTelegram();
+      if (result.state) state = { ...state, ...result.state };
+      $('#telegram-result').textContent = result.ok ? result.message : '';
+      if (!result.ok) $('#telegram-error').textContent = result.message;
+      render();
+      if (!result.ok) $('#telegram-error').textContent = result.message;
+    } catch (error) { $('#telegram-error').textContent = error.message; }
+    finally { buttons.forEach((button) => { button.disabled = false; }); }
+    return;
+  }
   const navigation = event.target.closest('[data-page]');
   if (navigation) {
     document.querySelectorAll('[data-page-panel]').forEach((panel) => panel.classList.toggle('hidden', panel.dataset.pagePanel !== navigation.dataset.page));
     document.querySelectorAll('.nav-button').forEach((button) => button.classList.toggle('active', button === navigation));
-    $('#page-title').textContent = navigation.dataset.page === 'lab' ? 'Проверка стратегий' : (navigation.dataset.page === 'routes' ? 'Маршруты VLESS' : 'Управление');
+    $('#page-title').textContent = navigation.dataset.page === 'telegram' ? 'Telegram Desktop' : (navigation.dataset.page === 'lab' ? 'Проверка стратегий' : (navigation.dataset.page === 'routes' ? 'Маршруты VLESS' : 'Управление'));
   }
   if (event.target.id === 'add-domain') { const input = $('#custom-domain'); const value = input.value.trim(); if (!value) return; customDomains = [...new Set([...customDomains, value])]; input.value = ''; await save(); }
   if (event.target.dataset.remove !== undefined) { customDomains.splice(Number(event.target.dataset.remove), 1); await save(); }

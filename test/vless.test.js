@@ -40,7 +40,12 @@ test('whole-internet VLESS mode keeps private networks direct and tunnels the re
 
 test('selected Windows process names can use selective VLESS routing', () => {
   const config = createSingBoxConfig(LINK, { services: [], apps: ['Discord.exe', 'not-an-exe'] });
-  const rule = config.route.rules.find((item) => item.process_name);
+  const rule = config.route.rules.find((item) => item.process_name && item.outbound === 'vless-out');
   assert.deepEqual(rule.process_name, ['Discord.exe']);
   assert.equal(rule.outbound, 'vless-out');
+});
+
+test('TGWs stays direct even when the default route uses VLESS', () => {
+  const config = createSingBoxConfig(LINK, { mode: 'all' });
+  assert.equal(config.route.rules.find((rule) => rule.process_name?.includes('local-route-tg.exe')).outbound, 'direct');
 });

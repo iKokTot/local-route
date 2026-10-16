@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, safeStorage, clipboard, dialog } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { spawn, execFileSync } = require('node:child_process');
@@ -8,6 +8,54 @@ const { createProfile, createEnginePlan, orderedAutoStrategies, STRATEGY_IDS } =
 const { buildEngineArgs } = require('./core/engine');
 const { createTaskArgs, deleteTaskArgs, queryTaskArgs } = require('./core/autostart');
 const { createVlessProfile, createSingBoxConfig, vlessProbe } = require('./core/vless');
+const { proxySettings, proxySecret, proxyLink, portAvailable, listenerReady } = require('./core/telegram-proxy');
+let telegramProcess = null;
+let telegramBusy = false;
+let telegramError = '';
+const telegramRunning = () => Boolean(telegramProcess && telegramProcess.exitCode === null && !telegramProcess.killed);
+function stopTelegram() {
+  if (telegramProcess) { expectedStops.add(telegramProcess); telegramProcess.kill(); }
+  telegramProcess = null;
+  pushLog('Telegram: локальный прокси остановлен.');
+}
+async function startTelegram() {
+  if (telegramRunning()) return { ok: true };
+  if (telegramBusy) return { ok: false, message: 'Telegram-прокси уже запускается.' };
+  telegramBusy = true; telegramError = '';
+  try {
+    const state = readState();
+    const settings = proxySettings(state.telegram);
+    const executable = path.join(engineRoot(), 'tg-ws', 'local-route-tg.exe');
+    if (!fs.existsSync(executable)) throw new Error('Ядро TGWs отсутствует в сборке.');
+    if (!await portAvailable(settings.port)) throw new Error(`Порт ${settings.port} занят. Если работает отдельный TGWs Proxy, используйте его в Telegram либо остановите его и повторите запуск.`);
+    let secret;
+    if (state.telegramSecret) secret = safeStorage.decryptString(Buffer.from(state.telegramSecret, 'base64'));
+    else {
+      if (!safeStorage.isEncryptionAvailable()) throw new Error('Шифрование Windows недоступно.');
+      secret = proxySecret();
+      writeState({ ...state, telegramSecret: safeStorage.encryptString(secret).toString('base64') });
+    }
+    const child = spawn(executable, ['--host', '127.0.0.1', '--port', String(settings.port), '--secret', secret, '--pool-size', '2'], { windowsHide: true, cwd: path.dirname(executable), stdio: ['ignore', 'pipe', 'pipe'] });
+    telegramProcess = child;
+    const output = (chunk) => {
+      const clean = String(chunk).replaceAll(secret, '[secret скрыт]').replace(/tg:\/\/\S+/g, '[ссылка скрыта]');
+      clean.split(/\r?\n/).filter(Boolean).forEach((line) => pushLog(`[tgws] ${line}`));
+    };
+    child.stdout.on('data', output); child.stderr.on('data', output);
+    child.once('error', (error) => { telegramError = error.message; });
+    child.once('exit', (code) => {
+      if (!expectedStops.has(child)) telegramError = `Telegram-прокси завершился: код ${code}. Откройте журнал.`;
+      if (telegramProcess === child) telegramProcess = null;
+    });
+    for (let attempt = 0; attempt < 30; attempt++) {
+      if (!telegramRunning()) throw new Error(telegramError || 'Telegram-прокси не запустился.');
+      if (await listenerReady(settings.port)) { pushLog('Telegram: локальный порт готов. Подключите прокси в Telegram Desktop.'); return { ok: true }; }
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+    stopTelegram(); throw new Error('Telegram-прокси не открыл локальный порт за отведённое время.');
+  } catch (error) { telegramError = error.message; return { ok: false, message: telegramError }; }
+  finally { telegramBusy = false; }
+}
 
 const stateFile = () => path.join(app.getPath('userData'), 'local-route.json');
 const defaults = { profile: createProfile({ services: ['youtube', 'discord'] }), enginePath: '', active: false, autoStart: false, verifiedStrategy: null, vless: createVlessProfile(), vlessConfigured: false, vlessActive: false };
@@ -312,8 +360,8 @@ function readState() {
 }
 function writeState(next) { fs.writeFileSync(stateFile(), JSON.stringify(next, null, 2), 'utf8'); }
 function publicState(next) {
-  const { vlessSecret, ...safe } = next;
-  return { ...safe, active: engineIsRunning(), vlessActive: vlessIsRunning() };
+  const { vlessSecret, telegramSecret, ...safe } = next;
+  return { ...safe, telegram: proxySettings(next.telegram), telegramActive: telegramRunning(), telegramBusy, telegramError, active: engineIsRunning(), vlessActive: vlessIsRunning() };
 }
 function profilesTargetSame(left, right) {
   return left.services.join('\n') === right.services.join('\n') && left.domains.join('\n') === right.domains.join('\n');
@@ -384,7 +432,7 @@ function createTray() {
   tray.setToolTip('Local Route');
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Открыть Local Route', click: showMainWindow },
-    { label: 'Остановить всё', click: () => { stopEngine(); stopVless(); } },
+    { label: 'Остановить всё', click: () => { stopEngine(); stopVless(); stopTelegram(); } },
     { type: 'separator' },
     { label: 'Выйти', click: () => app.quit() }
   ]));
@@ -448,6 +496,10 @@ app.whenReady().then(async () => {
       const result = await startVless();
       if (!result.ok) pushLog(`Автозапуск не включил VLESS: ${result.message}`);
     }
+    if (state.autoStart && state.telegram?.enabled) {
+      const result = await startTelegram();
+      if (!result.ok) pushLog(`Автозапуск Telegram: ${result.message}`);
+    }
     // Do not compete with Windows sign-in. Once the desktop is usable, load
     // the renderer invisibly so opening from tray is instant.
     const warmup = setTimeout(() => { if (!mainWindow && !isQuitting) createWindow({ showOnReady: false }); }, 8000);
@@ -455,7 +507,7 @@ app.whenReady().then(async () => {
   }
   app.on('activate', showMainWindow);
 });
-app.on('before-quit', () => { isQuitting = true; if (activeOperation) activeOperation.cancelled = true; stopEngine(); stopVless(); });
+app.on('before-quit', () => { isQuitting = true; if (activeOperation) activeOperation.cancelled = true; stopEngine(); stopVless(); stopTelegram(); });
 
 ipcMain.handle('state:read', () => { const state = { ...readState(), active: engineIsRunning(), autoStart: cachedAutoStart, vlessActive: vlessIsRunning() }; return { ...publicState(state), diagnostics: diagnostics(state), logs: readLogs() }; });
 ipcMain.handle('profile:save', (_event, raw) => {
@@ -502,6 +554,10 @@ ipcMain.handle('network:startAll', async () => {
     }
   }
   let vlessMessage = '';
+  if (current.telegram?.enabled) {
+    const result = await startTelegram();
+    if (!result.ok) return result;
+  }
   if (current.vlessConfigured && !vlessIsRunning()) {
     const vlessResult = await startVless();
     if (!vlessResult.ok) return { ok: false, message: `Zapret запущен, но VLESS не включился: ${vlessResult.message}` };
@@ -515,7 +571,7 @@ ipcMain.handle('network:startAll', async () => {
 });
 ipcMain.handle('network:stopAll', () => {
   if (activeOperation) activeOperation.cancelled = true;
-  stopEngine(); stopVless();
+  stopEngine(); stopVless(); stopTelegram();
   const state = { ...readState(), active: false, vlessActive: false };
   return { ...publicState(state), diagnostics: diagnostics(state), logs: readLogs() };
 });
@@ -523,6 +579,65 @@ ipcMain.handle('engine:stop', () => {
   if (activeOperation) activeOperation.cancelled = true;
   const state = stopEngine();
   return { ...publicState(state), active: false, diagnostics: diagnostics(state), logs: readLogs() };
+});
+ipcMain.handle('telegram:save', (_event, raw) => {
+  try {
+    if (telegramRunning() || telegramBusy) return { ok: false, message: 'Остановите Telegram-прокси перед изменением порта.' };
+    const state = { ...readState(), telegram: proxySettings(raw) };
+    writeState(state);
+    return { ok: true, state: publicState(state), message: 'Настройки Telegram сохранены.' };
+  } catch (error) { return { ok: false, message: error.message }; }
+});
+ipcMain.handle('telegram:start', async () => {
+  const result = await startTelegram();
+  return { ...result, state: publicState(readState()), message: result.message || 'Локальный прокси готов. Подтвердите подключение в Telegram.' };
+});
+ipcMain.handle('telegram:stop', () => { stopTelegram(); return { ok: true, state: publicState(readState()), message: 'Telegram-прокси остановлен.' }; });
+ipcMain.handle('telegram:connect', async () => {
+  try {
+    if (!telegramRunning()) return { ok: false, message: 'Сначала запустите Telegram-прокси.' };
+    const state = readState();
+    const secret = safeStorage.decryptString(Buffer.from(state.telegramSecret, 'base64'));
+    const link = proxyLink(proxySettings(state.telegram).port, secret);
+    const candidates = [
+      path.join(app.getPath('appData'), 'Telegram Desktop', 'Telegram.exe'),
+      ...(process.env.LOCALAPPDATA ? [path.join(process.env.LOCALAPPDATA, 'Programs', 'Telegram Desktop', 'Telegram.exe')] : []),
+      ...(process.env.ProgramFiles ? [path.join(process.env.ProgramFiles, 'Telegram Desktop', 'Telegram.exe')] : [])
+    ];
+    const executable = candidates.find((candidate) => fs.existsSync(candidate));
+    if (executable) {
+      await new Promise((resolve, reject) => {
+        const child = spawn(executable, ['--', link], { windowsHide: false, detached: true, stdio: 'ignore' });
+        child.once('error', reject);
+        child.once('spawn', () => { child.unref(); resolve(); });
+      });
+    } else {
+      try { await shell.openExternal(link); }
+      catch {
+        const selected = await dialog.showOpenDialog(mainWindow, { title: 'Выберите Telegram.exe', properties: ['openFile'], filters: [{ name: 'Telegram Desktop', extensions: ['exe'] }] });
+        if (selected.canceled || !selected.filePaths.length) return { ok: false, message: 'Telegram не открыт. Нажмите «Скопировать ссылку» и откройте её из «Избранного» в Telegram.' };
+        if (path.basename(selected.filePaths[0]).toLowerCase() !== 'telegram.exe') return { ok: false, message: 'Выберите файл Telegram.exe.' };
+        await new Promise((resolve, reject) => {
+          const child = spawn(selected.filePaths[0], ['--', link], { detached: true, stdio: 'ignore' });
+          child.once('error', reject);
+          child.once('spawn', () => { child.unref(); resolve(); });
+        });
+      }
+    }
+    return { ok: true, message: 'Подтвердите прокси в Telegram Desktop.' };
+  } catch (error) {
+    const code = /^[A-Z0-9_]+$/.test(error.code || '') ? ` (${error.code})` : '';
+    return { ok: false, message: `Не удалось передать подключение Telegram${code}. Скопируйте ссылку и откройте её из «Избранного» в Telegram.` };
+  }
+});
+ipcMain.handle('telegram:copy', () => {
+  try {
+    if (!telegramRunning()) return { ok: false, message: 'Сначала запустите Telegram-прокси.' };
+    const state = readState();
+    const secret = safeStorage.decryptString(Buffer.from(state.telegramSecret, 'base64'));
+    clipboard.writeText(proxyLink(proxySettings(state.telegram).port, secret));
+    return { ok: true, message: 'Ссылка скопирована. Вставьте её в «Избранное» Telegram, отправьте и нажмите для подключения. Ссылка содержит секрет локального прокси.' };
+  } catch { return { ok: false, message: 'Не удалось получить сохранённый секрет прокси.' }; }
 });
 ipcMain.handle('vless:save', (_event, raw) => {
   const state = readState();

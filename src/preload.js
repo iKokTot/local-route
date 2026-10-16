@@ -15,5 +15,10 @@ contextBridge.exposeInMainWorld('localRoute', {
   testVless: () => ipcRenderer.invoke('vless:test'),
   startAll: () => ipcRenderer.invoke('network:startAll'),
   stopAll: () => ipcRenderer.invoke('network:stopAll'),
+  saveTelegram: (raw) => ipcRenderer.invoke('telegram:save', raw),
+  startTelegram: () => ipcRenderer.invoke('telegram:start'),
+  stopTelegram: () => ipcRenderer.invoke('telegram:stop'),
+  connectTelegram: () => ipcRenderer.invoke('telegram:connect'),
+  copyTelegram: () => ipcRenderer.invoke('telegram:copy'),
   open: (url) => ipcRenderer.invoke('external:open', url)
 });

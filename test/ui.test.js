@@ -6,7 +6,7 @@ const path = require('node:path');
 test('Zapret auto-selection stays on its dedicated strategy page', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
   assert.equal((html.match(/data-auto-select/g) || []).length, 1);
-  assert.match(html, /Проверка стратегий/);
+  assert.match(html, /YouTube и Discord/);
   assert.match(html, /Автоподбор всех стратегий/);
 });
 
