@@ -1,0 +1,12 @@
+{
+  "avito": { "label": "Авито", "domains": ["avito.ru", "avito.st"] },
+  "wildberries": { "label": "Wildberries", "domains": ["wildberries.ru", "wb.ru", "wbbasket.ru", "wbstatic.net"] },
+  "ozon": { "label": "Ozon", "domains": ["ozon.ru", "ozone.ru", "ozonusercontent.com"] },
+  "vk": { "label": "ВКонтакте", "domains": ["vk.com", "vk.ru", "vk.me", "vkuseraudio.net", "vkuserlive.net", "vkuserphoto.ru", "vkuservideo.net"] },
+  "yandex": { "label": "Яндекс", "domains": ["yandex.ru", "yandex.com", "ya.ru", "yastatic.net", "yandex.net"] },
+  "gosuslugi": { "label": "Госуслуги", "domains": ["gosuslugi.ru"] },
+  "sber": { "label": "СберБанк", "domains": ["sberbank.ru", "sber.ru", "sberbank.com"] },
+  "tbank": { "label": "Т-Банк", "domains": ["tbank.ru", "tinkoff.ru"] },
+  "vtb": { "label": "ВТБ", "domains": ["vtb.ru"] },
+  "alfa": { "label": "Альфа-Банк", "domains": ["alfabank.ru"] }
+}

@@ -7,6 +7,9 @@ if (!executable) throw new Error('Pass the packaged Local Route.exe path.');
 const icon = path.join(__dirname, '..', 'src', 'renderer', 'assets', 'local-route.ico');
 rcedit(path.resolve(executable), {
   icon,
+  'file-version': require('../package.json').version,
+  'product-version': require('../package.json').version,
+  'requested-execution-level': 'requireAdministrator',
   'version-string': {
     ProductName: 'Local Route',
     FileDescription: 'Local Route',

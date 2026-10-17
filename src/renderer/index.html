@@ -2,204 +2,99 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Local Route</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<main class="shell">
+<a class="skip-link" href="#page-content">К содержимому</a>
+<div class="shell">
   <aside class="sidebar">
-    <div class="brand">
-      <img class="brand-mark" src="assets/local-route-mark.svg" alt="">
-      <span>Local Route</span>
-    </div>
-    <div class="sidebar-label">РАБОЧЕЕ ПРОСТРАНСТВО</div>
-    <nav class="side-nav" aria-label="Навигация">
-      <button class="nav-button active" data-page="control">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
-        Управление
-      </button>
-      <button class="nav-button" data-page="lab">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6M10 3v5l-5.5 9.4A2.4 2.4 0 0 0 6.6 21h10.8a2.4 2.4 0 0 0 2.1-3.6L14 8V3M8 15h8"/></svg>
-        YouTube и Discord
-      </button>
-      <button class="nav-button" data-page="telegram">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 3-4 18-6-5-4 3 1-6L3 10 21 3ZM8 13l9-7m-6 10 6-10"/></svg>
-        Telegram
-      </button>
-      <button class="nav-button" data-page="routes">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M14 6l3-3m-3 3 3 3M20 18H10m0 0-3-3m3 3-3 3M4 12h16"/></svg>
-        Маршруты VLESS
-      </button>
+    <div class="brand"><img src="assets/local-route-mark.svg" alt=""><span>Local Route<small>Подключение без лишнего</small></span></div>
+    <nav class="side-nav" aria-label="Разделы приложения">
+      <button class="nav-button active" data-page="control" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg><span>Обзор</span></button>
+      <button class="nav-button" data-page="lab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 10-13h-7l1-7Z"/></svg><span>DPI<small>YouTube и Discord</small></span></button>
+      <button class="nav-button" data-page="telegram"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10 21 3 14 21 11 13 3 10Z"/></svg><span>Telegram<small>Локальный прокси</small></span></button>
+      <button class="nav-button" data-page="routes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6l-8-3Z"/></svg><span>VPN<small>Сайты и приложения</small></span></button>
     </nav>
-    <div class="sidebar-label sidebar-links-label">ССЫЛКИ</div>
-    <nav class="side-nav sidebar-links" aria-label="Полезные ссылки">
-      <button class="nav-button nav-link" id="open-release-channel">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 4-3.1 16-5.8-4.2-3.2 3.1.5-4.5 8.3-7.5-10 6.2L3 11z"/></svg>
-        Канал релизов
-      </button>
-      <button class="nav-button nav-link" id="open-max-channel">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v10H9l-4 4V5Zm4 4h6m-6 3h4"/></svg>
-        Канал MAX
-      </button>
-      <button class="nav-button nav-link" id="open-repository">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14"/></svg>
-        Исходный код
-      </button>
-    </nav>
-    <div class="sidebar-foot">
-      <span class="local-dot"></span>
-      Всё работает локально
+    <div class="sidebar-bottom"><button class="text-button" data-page="settings">Настройки приложения</button>
+      
+      <div class="sidebar-foot">Local Route <span id="app-version"></span></div>
     </div>
   </aside>
-
-  <section class="workspace">
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">LOCAL ROUTE</p>
-        <h1 id="page-title">Управление</h1>
-      </div>
-      <div class="topbar-status"><span class="status-dot" id="status-dot"></span><strong id="engine-status">Готово к подбору</strong></div>
-    </header>
-
-    <div data-page-panel="control" class="page-panel">
-      <section class="protection-card">
-        <div class="protection-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3Zm-3 9 2 2 4-4"/></svg>
+  <div class="workspace">
+    <header class="topbar"><h1 id="page-title">Обзор</h1><button class="text-button settings-link" data-page="settings" aria-label="Настройки приложения">Настройки</button><div class="topbar-feedback"><div class="topbar-status" role="status"><span class="status-dot" id="status-dot"></span><span id="engine-status">Загрузка состояния…</span></div><div id="global-progress" class="operation-progress hidden" role="status"><i></i><span></span></div></div></header>
+    <main id="page-content" tabindex="-1">
+      <div id="app-error" class="notice error hidden" role="alert"></div>
+      <section data-page-panel="control" class="page-panel" aria-label="Обзор подключений">
+        <div class="overview-heading"><p id="protection-title" class="muted">Компоненты выключены</p><div class="connection-actions"><button class="button primary" id="start-all">Запустить всё</button><button class="button outlined" id="stop-all">Остановить всё</button></div></div>
+        <div class="component-grid">
+          <article class="panel component-card"><div class="component-heading"><span class="component-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 10-13h-7l1-7Z"/></svg></span><span class="route-state" id="dpi-run-state">Выключен</span></div><h3>YouTube и Discord</h3><p class="component-subtitle">Обход DPI · Zapret</p><p class="component-detail" id="dpi-detail">Сначала подберите стратегию.</p><div class="card-actions"><button class="button tonal" id="start-dpi">Запустить DPI</button><button class="text-button" data-page="lab">Настроить <span aria-hidden="true">→</span></button></div></article>
+          <article class="panel component-card"><div class="component-heading"><span class="component-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6l-8-3Z"/></svg></span><span class="route-state" id="vless-run-state">Не настроен</span></div><h3>VPN</h3><p class="component-subtitle">Маршруты через ваш сервер</p><p class="component-detail" id="vless-detail">Добавьте ссылку подключения.</p><div class="card-actions"><button class="button tonal" id="start-vless">Запустить VLESS</button><button class="text-button" data-page="routes">Настроить <span aria-hidden="true">→</span></button></div></article>
+          <article class="panel component-card"><div class="component-heading"><span class="component-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 10 21 3 14 21 11 13 3 10Z"/></svg></span><span class="route-state" id="telegram-run-state">Выключен</span></div><h3>Telegram</h3><p class="component-subtitle">Локальный прокси · TGWs</p><p class="component-detail" id="telegram-detail">После запуска подключите прокси в Telegram.</p><div class="card-actions"><button class="button tonal" id="start-telegram">Запустить прокси</button><button class="text-button" data-page="telegram">Настроить <span aria-hidden="true">→</span></button></div></article>
         </div>
-        <div class="protection-copy"><span>Локальная защита</span><strong id="protection-title">Выберите сервисы и запустите подбор</strong><small id="protection-description">Подбор проверит доступность и оставит включённой подходящую стратегию.</small><div class="run-states"><span id="dpi-run-state">DPI · не запущен</span><span id="vless-run-state">VLESS · не запущен</span></div></div>
-        <div class="connection-actions">
-          <button class="button primary" id="start-all"><span class="button-icon">▶</span> Запустить всё</button>
-          <button class="button secondary" id="start-vless"><span class="button-icon">◉</span> VLESS</button>
-          <button class="button secondary" id="start-dpi"><span class="button-icon">◌</span> DPI</button>
-          <button class="danger-button" id="stop-all"><span class="button-icon">■</span> Остановить всё</button>
+        <div class="dashboard-grid">
+          <details class="panel compact-settings" id="overview-diagnostics"><summary>Диагностика и отчёт</summary><div class="panel-heading"><div><p class="eyebrow">НА ЭТОМ УСТРОЙСТВЕ</p><h2>Диагностика</h2></div><button id="export-diagnostics" class="text-button">Сохранить диагностику</button><button id="run-check" class="text-button">Обновить</button></div><div id="diagnostics" class="diagnostics"></div></details>
+          <section class="panel autostart-panel"><div class="setting-row"><div><p class="eyebrow">ЗАПУСК WINDOWS</p><h2>Запуск приложения</h2></div><label class="switch"><input id="autostart-toggle" type="checkbox" aria-label="Запускать Local Route при входе в Windows"><span></span></label></div><p id="autostart-description" class="setting-description"></p><div id="launch-component-settings"><p class="setting-description launch-help">Выберите компоненты отдельно для входа в Windows и кнопки «Запустить всё». Если снять все галочки автозапуска, приложение останется в трее без запуска компонентов.</p><fieldset class="launch-options"><legend>При входе в Windows</legend><label class="service"><input type="checkbox" data-launch-group="auto" value="dpi"><span>DPI · YouTube и Discord</span></label><label class="service"><input type="checkbox" data-launch-group="auto" value="telegram"><span>Telegram</span></label><label class="service"><input type="checkbox" data-launch-group="auto" value="vpn"><span>VPN</span></label></fieldset><fieldset class="launch-options"><legend>Кнопка «Запустить всё»</legend><label class="service"><input type="checkbox" data-launch-group="all" value="dpi"><span>DPI · YouTube и Discord</span></label><label class="service"><input type="checkbox" data-launch-group="all" value="telegram"><span>Telegram</span></label><label class="service"><input type="checkbox" data-launch-group="all" value="vpn"><span>VPN</span></label></fieldset><p class="setting-description">Изменения сохраняются сразу и не переключают работающие компоненты. DPI требует сохранённой стратегии, VPN — настроенного сервера.</p></div><div class="info-note">Закрытие окна оставляет приложение и запущенные компоненты в трее. Для завершения выберите «Выйти» в меню значка.</div></section>
+        </div>
+        <details class="technical-log" id="technical-log"><summary>Технический журнал</summary><pre id="engine-log" class="engine-log">Нет технических событий.</pre></details>
+      </section>
+      <section data-page-panel="lab" class="page-panel hidden" aria-label="Настройки DPI">
+        <p class="page-intro">Локальный обход для YouTube и Discord. Сначала запуск, затем настройки и результаты.</p>
+        <div class="service-layout lab-grid">
+          <div class="service-connection"><section class="panel strategy-panel">
+            <div class="panel-heading"><div><p class="eyebrow">DPI</p><h2>YouTube и Discord</h2></div><span class="route-state" id="dpi-strategy-state">Не подобрана</span></div>
+            <div class="service-command-bar" role="group" aria-label="Управление DPI"><button class="button primary" id="start-saved-dpi">Запустить сохранённую</button><button class="button outlined" data-auto-select>Подобрать и запустить</button><button class="button outlined danger stop-engine">Остановить DPI</button></div>
+            <p class="setting-description" id="dpi-strategy-description"></p>
+            <details id="android-dpi-profile" class="hidden advanced"><summary>Своя строка ByeDPI</summary><label class="custom-label" for="dpi-command">Строка ByeDPI</label><textarea id="dpi-command"></textarea><button class="text-button" id="save-dpi-command">Сохранить профиль DPI</button></details>
+            <details class="advanced"><summary>Ручная проверка стратегий <span class="counter" id="strategy-count"></span></summary><p class="setting-description">Одиночная проверка временно останавливает DPI. Успешная стратегия сохраняется; после проверки DPI остаётся выключенным.</p><div id="strategy-tests" class="strategy-tests"></div></details>
+          </section></div>
+          <div class="service-settings"><details class="panel compact-settings" id="dpi-services-settings"><summary>Сервисы и домены DPI</summary><div class="panel-heading"><h2>Сервисы для обхода</h2><span class="counter" id="domain-count"></span></div><div id="service-list" class="service-list"></div><label class="custom-label" for="custom-domain">Дополнительный домен</label><div class="add-domain"><input id="custom-domain" placeholder="example.org" spellcheck="false"><button class="button tonal" id="add-domain" aria-label="Добавить домен">Добавить</button></div><div class="chips" id="custom-domains"></div><div class="save-row"><span id="dpi-save-status" class="setting-description"></span><button class="text-button" data-reset-kind="dpi">Сбросить изменения</button><button class="button outlined" id="save-dpi">Сохранить сервисы</button></div><p class="setting-description">Для изменения работающего профиля остановите DPI. После изменения сервисов потребуется новый подбор стратегии.</p></details></div>
+          <div class="service-feedback"><section class="panel activity-panel"><div class="panel-heading"><h2>Результаты и события</h2><button id="refresh-log" class="text-button">Обновить</button></div><div id="android-dpi-feedback" class="hidden"><p id="dpi-trial-status" class="setting-description"></p><div class="vless-actions"><button class="button primary" id="confirm-dpi">Работает — сохранить</button><button class="button outlined" id="reject-dpi">Не работает — следующий</button></div></div><div id="test-results" class="test-results"><p class="setting-description">Результат появится после подбора или проверки стратегии.</p></div><details class="advanced"><summary>Последние события</summary><div id="activity-log" class="activity-log"></div></details></section><button class="text-button" data-page="control" data-open-log="true">Открыть общий журнал →</button></div>
         </div>
       </section>
-
-      <section class="dashboard-grid">
-        <div class="panel services-panel">
-          <div class="panel-heading"><div><p class="eyebrow">СЕРВИСЫ</p><h2>Защищать соединения</h2></div><span class="counter" id="domain-count">0 доменов</span></div>
-          <div class="service-list" id="service-list"></div>
-          <label class="custom-label">Свой домен <span>необязательно</span>
-            <div class="add-domain"><input id="custom-domain" placeholder="например, example.org"><button id="add-domain" aria-label="Добавить домен">+</button></div>
-          </label>
-          <div class="chips" id="custom-domains"></div>
+      <section data-page-panel="routes" class="page-panel hidden" aria-label="Настройки VLESS">
+        <p class="page-intro">Подключите сервер. Весь интернет пойдёт через VPN, а сайты и приложения из исключений — напрямую.</p>
+        <div class="service-layout routes-grid">
+          <div class="service-connection"><section class="panel vless-connection-panel">
+            <div class="panel-heading"><div><p class="eyebrow">VPN</p><h2>Подключение через сервер</h2></div><span class="route-state" id="vless-state">Не настроен</span></div>
+            <div class="service-command-bar" role="group" aria-label="Управление VPN"><button class="button primary" id="toggle-vless">Запустить VPN</button><button class="button outlined" id="test-vless">Проверить подключение</button><button class="button outlined danger" id="stop-vless">Остановить VPN</button></div>
+            <p id="selected-server-summary" class="setting-description"></p><p id="vpn-connection-status" class="connection-check-state" role="status"></p>
+            <details class="advanced" id="server-management"><summary>Серверы и подписки <span class="counter" id="vpn-server-count">0</span></summary>
+              <div id="subscription-empty" class="empty-subscriptions"><p class="setting-description">Добавьте HTTPS-подписку, список серверов или отдельную ссылку.</p></div>
+              <div class="subscription-toolbar"><button class="button tonal" id="open-subscription">Добавить подписку</button><button class="text-button" id="refresh-subscription">Обновить подписки</button></div>
+              <div id="vless-servers" class="server-library"></div>
+              <div class="server-check-actions"><button class="button outlined" id="auto-server">Выбрать быстрый сервер</button><button class="button outlined" id="check-servers">Проверить список</button><button class="text-button hidden" id="cancel-server-check">Отменить проверку</button></div>
+              <details id="single-server-editor" class="advanced"><summary>Отдельная ссылка</summary><label class="sr-only" for="vless-uri">VLESS-ссылка</label><textarea id="vless-uri" spellcheck="false" placeholder="vless://… или hy2://…"></textarea></details>
+              <p id="vless-profile-hint" class="setting-description">Ссылка хранится на устройстве в зашифрованном виде.</p><button class="text-button danger" id="delete-vless">Удалить профиль и список серверов</button>
+            </details>
+          </section></div>
+          <div class="service-settings column"><details class="panel compact-settings" id="vpn-exclusions-settings"><summary id="vpn-exclusions-summary">Исключения из VPN</summary><div class="panel-heading"><div><p class="eyebrow">МАРШРУТЫ</p><h2>Исключения из VPN</h2></div><span class="counter" id="vless-domain-count">0 доменов</span></div><p id="vless-edit-hint" class="info-note hidden">Чтобы изменить профиль, остановите VLESS. После сохранения запустите его снова.</p><input id="vless-mode" type="hidden" value="exclude"><p id="vless-migration-note" class="info-note hidden">Сохранён прежний режим маршрутизации. Чтобы перейти на VPN с исключениями, остановите VPN и нажмите «Сохранить исключения». Прежние выбранные сайты и приложения не станут исключениями автоматически.</p><div id="vless-all-note" class="info-note hidden">По умолчанию весь внешний трафик идёт через VPN. Отмеченные ниже сайты и приложения подключаются напрямую: их IP не скрывается VPN. Локальная сеть, TGWs и включённые сервисы DPI также остаются напрямую.</div><div id="vless-selective-settings"><label class="service"><input id="recommended-exclusions" type="checkbox"><span>Рекомендуемые исключения<small>Банки, покупки и повседневные сервисы — напрямую</small></span></label><h3 class="section-label">Популярные сайты без VPN</h3><p class="setting-description">Галочка означает прямое подключение. Ничего не отмечено — весь интернет через VPN. Это стартовый список доменов, а не гарантия покрытия всех ресурсов сервиса.</p><div class="service-list" id="vless-service-list"></div><label class="custom-label" for="vless-custom-domain">Свой сайт без VPN</label><div class="add-domain"><input id="vless-custom-domain" placeholder="example.com" spellcheck="false"><button class="button tonal" id="add-vless-domain">Добавить</button></div><div class="chips" id="vless-custom-domains"></div><details class="advanced" id="vpn-app-exclusions"><summary>Приложения без VPN <span class="counter" id="vless-app-count">0 выбрано</span></summary><p class="setting-description">Отмеченное приложение подключается напрямую ко всем сайтам. Для точечных исключений используйте домены выше. Правило действует на имя .exe; отдельные сетевые процессы приложения нужно добавить тоже.</p><label class="sr-only" for="app-search">Найти приложение</label><input id="app-search" type="search" placeholder="Найти приложение…"><div id="vless-app-list" class="app-list"></div><p id="app-search-empty" class="setting-description hidden">Приложение не найдено. Добавьте имя его .exe ниже.</p><label class="custom-label" for="manual-vless-app">Другое приложение · имя файла .exe</label><div class="add-domain"><input id="manual-vless-app" placeholder="my-app.exe" spellcheck="false"><button class="button tonal" id="add-vless-app">Добавить</button></div><button class="text-button" id="pick-vless-app">Выбрать файл приложения…</button></details></div><div class="editor-save-bar"><p class="setting-description" id="vless-save-status">Настройте сервер и маршруты, затем сохраните профиль.</p><button class="button outlined" data-reset-kind="vless">Сбросить изменения</button><button class="button primary" id="save-vless">Сохранить исключения</button></div></details></div>
+          <div class="service-feedback feedback-grid"><details class="panel compact-settings" id="vpn-check-results"><summary>Качество соединения и результаты</summary><p class="setting-description">Скорость: одно скачивание до Cloudflare через текущий VPN, до 10 МБ и 20 секунд. Не измеряет предел скорости интернета.</p><button class="button outlined" id="test-vless-speed">Измерить скорость VPN · до 10 МБ</button><div id="vless-test-results" class="vless-test-results" aria-live="polite"><p class="setting-description">Проверка выполняется через сервер. Исключения этим тестом не проверяются.</p></div></details><div class="hidden route-note"><span id="route-mode-title"></span><span id="route-mode-description"></span></div><div class="journal-link"><button class="text-button" data-page="control" data-open-log="true">Открыть общий журнал →</button></div></div>
         </div>
-
-        <aside class="side">
-          <div class="panel diagnostics-panel">
-            <div class="panel-heading"><div><p class="eyebrow">СОСТОЯНИЕ</p><h2>Диагностика</h2></div><button class="text-button" id="run-check">Обновить</button></div>
-            <div class="diagnostics" id="diagnostics"></div>
-          </div>
-          <div class="panel startup-panel">
-            <div class="setting-row">
-              <div class="setting-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M12 3v9m0 0 4-4m-4 4L8 8M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>
-              </div>
-              <div class="setting-copy">
-                <p class="eyebrow">ЗАПУСК WINDOWS</p>
-                <h2>Автозапуск</h2>
-              </div>
-              <label class="switch" title="Включить автозапуск">
-                <input id="autostart-toggle" type="checkbox">
-                <span></span>
-              </label>
-            </div>
-            <p id="autostart-description" class="setting-description">Использует последнюю подтверждённую стратегию и остаётся в трее.</p>
-          </div>
-        </aside>
       </section>
-    </div>
-
-    <section class="page-panel lab hidden" data-page-panel="lab">
-      <div class="page-intro"><p class="eyebrow">ЛОКАЛЬНЫЙ ТЕСТ</p><p>Проверяйте стратегии по отдельности или запустите автоподбор. Краткие результаты видны сразу, а технический журнал открыт только при необходимости.</p></div>
-      <div class="lab-grid">
-        <div class="panel strategy-panel">
-          <div class="panel-heading"><div><p class="eyebrow">АВТОМАТИКА</p><h2>Подбор стратегии</h2></div></div>
-          <button class="button primary auto-select" data-auto-select><span class="button-icon">↗</span> Автоподбор всех стратегий</button>
-          <div id="operation-progress" class="operation-progress hidden" role="status"><i></i><span>Подготовка проверки…</span></div>
-          <div class="strategy-label">Проверить одну из 22 стратегий Zapret</div>
-          <div id="strategy-tests" class="strategy-tests"></div>
-          <button class="danger-button stop-engine"><span class="button-icon">■</span> Остановить подбор и драйвер</button>
+      <section data-page-panel="telegram" class="page-panel hidden" aria-label="Настройки Telegram">
+        <p class="page-intro">Локальный прокси для Telegram Desktop, без отдельного VPN-сервера.</p>
+        <div class="service-layout telegram-layout">
+          <div class="service-connection"><section class="panel telegram-panel">
+            <div class="panel-heading"><div><p class="eyebrow">TELEGRAM</p><h2>Telegram Desktop</h2></div><span id="telegram-state" class="route-state">Выключен</span></div>
+            <div class="service-command-bar telegram-primary-actions" role="group" aria-label="Управление Telegram"><button class="button primary" id="telegram-start">Запустить прокси</button><button class="button outlined" id="telegram-connect">Открыть Telegram ↗</button><button class="button outlined danger" id="telegram-stop">Остановить прокси</button></div>
+            <p id="telegram-result" role="status" class="setting-description">После запуска откройте Telegram и подтвердите предложенный прокси. Готовность порта не подтверждает доступность сообщений.</p><p id="telegram-error" role="alert" class="notice error"></p>
+            <details class="advanced" id="telegram-manual-link"><summary>Подключить вручную</summary><p class="setting-description">Скопируйте ссылку, вставьте её в «Избранное» Telegram и откройте. Ссылка содержит секрет локального прокси.</p><button class="text-button telegram-copy" id="telegram-copy">Скопировать ссылку подключения</button></details>
+          </section></div>
+          <div class="service-settings"><details class="panel compact-settings" id="telegram-proxy-settings"><summary>Параметры прокси <span class="counter" id="telegram-port-summary">1443</span></summary><p id="telegram-settings-hint" class="setting-description">Измените порт только при конфликте. Автозапуск находится в общих настройках.</p><label class="vless-label" for="telegram-port">Локальный порт</label><input id="telegram-port" type="number" min="1024" max="65535" step="1" value="1443" aria-describedby="telegram-port-hint"><p class="field-hint" id="telegram-port-hint">От 1024 до 65535. По умолчанию — 1443.</p><div class="save-row"><span id="telegram-save-status" class="setting-description"></span><button class="text-button" data-reset-kind="telegram">Сбросить изменения</button><button class="button outlined" id="telegram-save">Сохранить настройки</button></div></details></div>
+          <div class="service-feedback"><details class="panel compact-settings telegram-help"><summary>Как подключить Telegram</summary><ol class="steps"><li><span>1</span><div><strong>Запустите прокси</strong><p>Дождитесь готовности локального порта.</p></div></li><li><span>2</span><div><strong>Откройте Telegram</strong><p>Подтвердите предложенный прокси в Telegram Desktop.</p></div></li><li><span>3</span><div><strong>Проверьте сообщения</strong><p>Откройте чат и убедитесь, что сообщения загружаются.</p></div></li></ol><p class="setting-description">Работает только на этом компьютере. Telegram Web и другие устройства не обслуживаются. TGWs выходит напрямую, в том числе при включённом VPN.</p></details><button class="text-button" data-page="control" data-open-log="true">Открыть общий журнал →</button></div>
         </div>
-        <div class="lab-output">
-          <div class="panel activity-panel">
-            <div class="panel-heading"><div><p class="eyebrow">РЕЗУЛЬТАТЫ</p><h2>Проверки и события</h2></div><button id="refresh-log" class="text-button">Обновить</button></div>
-            <div id="test-results" class="test-results"><span class="muted">Результаты появятся после запуска теста.</span></div>
-            <div id="activity-log" class="activity-log"><span class="muted">Нет событий.</span></div>
-          </div>
-          <details class="technical-log">
-            <summary><span>Технический журнал движка</span><small>для диагностики</small></summary>
-            <pre id="engine-log" class="engine-log">Нет технических событий.</pre>
-          </details>
-        </div>
-      </div>
-    </section>
-
-    <section class="page-panel routes-panel hidden" data-page-panel="routes">
-      <div class="page-intro"><p class="eyebrow">VLESS</p><p>Настройте отдельные маршруты либо включите обычный VPN-режим для всего интернета. Проверка не меняет уже работающий маршрут.</p></div>
-      <div class="routes-grid">
-        <div class="panel">
-          <div class="panel-heading"><div><p class="eyebrow">МАРШРУТИЗАЦИЯ</p><h2>Режим VLESS</h2></div><span class="counter" id="vless-domain-count">0 доменов</span></div>
-          <label class="vless-label">Режим
-            <select id="vless-mode"><option value="selective">Только выбранные сервисы</option><option value="all">Весь интернет через VLESS</option></select>
-          </label>
-          <div id="vless-selective-settings">
-            <p class="setting-description">Эти сервисы пойдут через VLESS; YouTube и Discord продолжит обрабатывать Zapret.</p>
-            <div class="service-list" id="vless-service-list"></div>
-            <label class="custom-label">Свой домен через VLESS <span>необязательно</span>
-            <div class="add-domain"><input id="vless-custom-domain" placeholder="например, example.com"><button id="add-vless-domain" aria-label="Добавить домен в VLESS">+</button></div>
-            </label>
-            <div class="chips" id="vless-custom-domains"></div>
-            <div class="apps-heading"><strong>Приложения через VLESS</strong><span class="counter">библиотека</span></div>
-            <p class="setting-description">Выбранные приложения направляются через туннель независимо от домена. Для браузера через VLESS пойдёт весь его трафик.</p>
-            <div id="vless-app-list" class="app-list"></div>
-            <label class="custom-label">Добавить приложение вручную <span>имя файла .exe</span>
-              <div class="add-domain"><input id="manual-vless-app" placeholder="например, my-app.exe"><button id="add-vless-app" aria-label="Добавить приложение в VLESS">+</button></div>
-            </label>
-          </div>
-        </div>
-        <aside class="side">
-          <div class="panel vless-connection-panel">
-            <div class="panel-heading"><div><p class="eyebrow">ПОДКЛЮЧЕНИЕ</p><h2>VLESS</h2></div><span class="route-state" id="vless-state">Не настроен</span></div>
-            <label class="vless-label">VLESS-ссылка
-              <textarea id="vless-uri" spellcheck="false" placeholder="vless://…"></textarea>
-            </label>
-            <p class="setting-description">Ссылка шифруется Windows и не передаётся в журнал, интерфейс или Git.</p>
-            <div class="vless-actions"><button class="button secondary" id="save-vless">Сохранить профиль</button><button class="button primary" id="toggle-vless">Включить VLESS</button><button class="button secondary" id="test-vless">Проверить VLESS</button></div>
-            <div id="vless-progress" class="operation-progress hidden" role="status"><i></i><span>Подготавливаю VLESS…</span></div>
-          </div>
-          <div class="panel route-note"><p class="eyebrow">МАРШРУТ ПО УМОЛЧАНИЮ</p><h2 id="route-mode-title">Напрямую</h2><p id="route-mode-description">Авито, WB, Ozon, VK, банки, локальная сеть и все невыбранные сайты не используют сервер.</p></div>
-        </aside>
-      </div>
-    </section>
-
-    <section class="page-panel hidden" data-page-panel="telegram">
-      <div class="telegram-layout">
-        <div class="panel telegram-panel">
-          <div class="panel-heading"><div><p class="eyebrow">ЛОКАЛЬНОЕ ПОДКЛЮЧЕНИЕ</p><h2>Telegram Desktop</h2></div><span id="telegram-state" class="route-state">Выключен</span></div>
-          <p class="telegram-description">Запустите прокси и подтвердите подключение в Telegram. Отдельный сервер не требуется.</p>
-          <div class="telegram-primary-actions">
-            <button class="button primary" id="telegram-start"><span aria-hidden="true">▶</span> Запустить прокси</button>
-            <button class="button secondary" id="telegram-connect"><span aria-hidden="true">↗</span> Открыть Telegram</button>
-            <button class="danger-button" id="telegram-stop"><span aria-hidden="true">■</span> Остановить</button>
-          </div>
-          <div class="telegram-settings">
-            <label class="vless-label">Локальный порт<input id="telegram-port" type="number" min="1024" max="65535" value="1443"></label>
-            <button class="button secondary" id="telegram-save">Сохранить настройки</button>
-          </div>
-          <label class="service telegram-autostart"><input id="telegram-enabled" type="checkbox"><span>Запускать вместе со всеми компонентами<small>Через «Запустить всё» и при автозапуске Windows</small></span></label>
-          <button class="text-button telegram-copy" id="telegram-copy">⧉ Скопировать ссылку подключения</button>
-          <p id="telegram-result" role="status" class="setting-description">Запустите прокси и подтвердите подключение в Telegram Desktop. Готовность порта не означает, что Telegram уже подключён.</p>
-          <p id="telegram-error" role="alert" class="setting-description"></p>
-        </div>
-        <aside class="panel telegram-help"><p class="eyebrow">КАК ПОДКЛЮЧИТЬ</p><h2>Три простых шага</h2><ol><li>Запустите локальный прокси.</li><li>Нажмите «Открыть Telegram».</li><li>Подтвердите подключение в Telegram.</li></ol><p>Если окно подключения не появилось, скопируйте ссылку и откройте её из «Избранного».</p><p class="setting-description">TGWs выходит напрямую, включая режим VLESS. Готовность локального порта не подтверждает доступность Telegram у провайдера.</p></aside>
-      </div>
-    </section>
-    <footer><span>Закрытие окна сворачивает Local Route в область уведомлений Windows.</span><span>Ссылки и обновления — в левой панели.</span></footer>
-  </section>
-</main>
-<div id="toast" role="status"></div>
+      </section>
+      <section data-page-panel="settings" class="page-panel hidden" aria-label="Общие настройки"><button class="text-button" id="back-settings">← Назад</button><section class="panel"><p class="eyebrow">ПРИЛОЖЕНИЕ</p><h2>Общие настройки</h2><p class="setting-description">Local Route <span id="settings-version"></span></p><div id="general-platform-settings"></div></section><section class="panel project-links"><h2>Ссылки проекта</h2><button class="text-button" id="open-release-channel">Канал релизов ↗</button><button class="text-button" id="open-max-channel">Канал MAX ↗</button><button class="text-button" id="open-repository">Исходный код ↗</button></section></section>
+      <dialog id="subscription-dialog"><form method="dialog" class="subscription-form"><div class="panel-heading"><h2>Добавить подписку</h2><button class="text-button" value="cancel" aria-label="Закрыть">✕</button></div><label class="vless-label" for="subscription-name">Название (необязательно)</label><input id="subscription-name" placeholder="Моя подписка"><label class="vless-label" for="subscription-input">HTTPS-ссылка, VLESS, Hysteria2 или sing-box JSON</label><textarea id="subscription-input" spellcheck="false" placeholder="https://…"></textarea><p class="setting-description">Ссылка хранится зашифрованно. Поддерживаются VLESS, Hysteria2, Base64 и sing-box JSON. XHTTP отмечается как неподдерживаемый.</p><div class="vless-actions"><button type="button" class="button primary" id="import-subscription">Добавить</button><button type="button" class="button outlined" id="paste-subscription">Вставить из буфера</button><button class="button outlined" value="cancel">Отмена</button></div></form></dialog>
+      <footer>Local Route управляет подключениями на этом компьютере.</footer>
+    </main>
+  </div>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="android-bridge.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

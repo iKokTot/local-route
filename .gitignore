@@ -1,5 +1,7 @@
 node_modules/
 outputs/
+artifacts/
+engine/tg-build/
 work/
 *.log
 .DS_Store

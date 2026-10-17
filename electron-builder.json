@@ -1,0 +1,21 @@
+{
+  "appId": "com.localroute.app",
+  "productName": "Local Route",
+  "directories": { "output": "outputs/installer-0.26.4" },
+  "win": {
+    "target": [{"target":"nsis","arch":["x64"]}],
+    "icon": "src/renderer/assets/local-route.ico",
+    "signAndEditExecutable": false
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "runAfterFinish": false,
+    "deleteAppDataOnUninstall": false,
+    "artifactName": "Local-Route-Setup-${version}-${arch}.${ext}",
+    "include": "scripts/installer-hooks.nsh"
+  }
+}

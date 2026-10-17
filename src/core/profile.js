@@ -88,7 +88,7 @@ function createProfile({ services = [], customDomains = [], strategy = 'auto' } 
   ];
   return {
     services: selected,
-    customDomains: [...new Set(domains.filter((domain) => !Object.values(SERVICE_CATALOG).flatMap((service) => service.domains).includes(domain)))],
+    customDomains: [...new Set(customDomains.map(normalizeDomain).filter(isDomain))],
     strategy: STRATEGY_IDS.has(strategy) ? strategy : 'auto',
     domains: [...new Set(domains)].sort()
   };
