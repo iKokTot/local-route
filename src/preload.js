@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('localRoute', {
   deleteVless: () => ipcRenderer.invoke('vless:delete'),
   pickApplication: () => ipcRenderer.invoke('applications:pick'),
   exportDiagnostics: () => ipcRenderer.invoke('diagnostics:export'),
+  explainRoute: (site) => ipcRenderer.invoke('route:explain', site),
   onProgress: (callback) => {
     const listener = (_event, progress) => callback(progress);
     ipcRenderer.on('operation:progress', listener);

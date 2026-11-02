@@ -1,0 +1,22 @@
+name: Unit and UI (not Windows route certification)
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  unit-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      LOCAL_ROUTE_BROWSER: chromium
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test

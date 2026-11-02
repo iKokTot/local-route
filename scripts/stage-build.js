@@ -1,0 +1,26 @@
+// Clean, allowlisted staging; never copy a previous application build.
+const fs=require('node:fs');const path=require('node:path');const {execFileSync}=require('node:child_process');
+const {verifyEngines,COMPONENTS}=require('./engine-integrity');
+const root=path.resolve(__dirname,'..');const pkg=require('../package.json');
+const stage=path.join(root,'outputs','Local Route '+pkg.version);
+if(fs.existsSync(stage))throw new Error('Stage exists. Preserve it or choose a new version: '+stage);
+const electronRoot=path.dirname(require.resolve('electron/package.json'));
+const electronPkg=require(path.join(electronRoot,'package.json'));
+if(electronPkg.version!==pkg.devDependencies.electron)throw new Error('Electron differs from exact package pin');
+verifyEngines(path.join(root,'engine'),require('../src/config/engine-lock.json'));
+const runtime=path.join(electronRoot,'dist');
+if(!fs.existsSync(path.join(runtime,'electron.exe')))throw new Error('Run node node_modules/electron/install.js first');
+fs.mkdirSync(path.dirname(stage),{recursive:true});fs.cpSync(runtime,stage,{recursive:true,errorOnExist:true,force:false});
+fs.renameSync(path.join(stage,'electron.exe'),path.join(stage,'Local Route.exe'));
+const app=path.join(stage,'resources','app');fs.mkdirSync(app,{recursive:true});
+for(const entry of ['src','package.json','LICENSE','THIRD_PARTY_NOTICES.md'])fs.cpSync(path.join(root,entry),path.join(app,entry),{recursive:true});
+for(const component of COMPONENTS)fs.cpSync(path.join(root,'engine',component),path.join(app,'engine',component),{recursive:true});
+fs.copyFileSync(path.join(root,'engine','LICENSE.txt'),path.join(app,'engine','LICENSE.txt'));
+const host=require('./build-process-host').buildHost();
+fs.mkdirSync(path.join(app,'native'),{recursive:true});
+fs.copyFileSync(host,path.join(app,'native','LocalRoute.ProcessHost.exe'));
+execFileSync(process.execPath,[path.join(__dirname,'embed-icon.js'),path.join(stage,'Local Route.exe')],{stdio:'inherit',windowsHide:true});
+verifyEngines(path.join(app,'engine'),require('../src/config/engine-lock.json'));
+const crypto=require('node:crypto');
+fs.writeFileSync(path.join(stage,'build-info.json'),JSON.stringify({version:pkg.version,electron:electronPkg.version,engines:require('../src/config/engine-lock.json'),processHostSha256:crypto.createHash('sha256').update(fs.readFileSync(host)).digest('hex')},null,2));
+console.log('Clean stage verified: '+stage);

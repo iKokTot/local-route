@@ -5,12 +5,15 @@ const net = require('node:net');
 const path = require('node:path');
 const fs = require('node:fs');
 const { spawn } = require('node:child_process');
-const { runWithInput, terminateChild } = require('../platform/windows');
+const { runWithInput, terminateChild,spawnOwned } = require('../platform/windows');
 const { createVlessCheckConfig, createVlessProfile, vlessProbeTargets } = require('./vless');
 const { listenerReady } = require('./telegram-proxy');
 
 function responseResult(statusCode) {
   return { success: statusCode >= 200 && statusCode < 400, reachable: true, statusCode, level: statusCode < 400 ? 'ok' : (statusCode < 500 ? 'warning' : 'fail'), detail: statusCode >= 400 && statusCode < 500 ? `HTTP ${statusCode} · сайт ответил, доступ ограничен` : `HTTP ${statusCode}` };
+}
+function speedResponseError(statusCode) {
+  return statusCode === 200 ? null : {success:false,reachable:true,statusCode,level:'fail',detail:`Замер не выполнен: HTTP ${statusCode}, ожидался полный файл (HTTP 200)`};
 }
 // CONNECT is always sent to the diagnostic proxy. This probe cannot silently
 // fall back to a direct HTTPS connection or depend on the app's process rule.
@@ -52,8 +55,11 @@ function probeThroughProxy(url, port, { timeoutMs = 8000, signal, downloadBytes 
       connectRequest.once('error', (error) => reply(error));
       connectRequest.end();
     };
-    request = https.get(target, { agent, headers: { 'User-Agent': 'LocalRoute/0.15.2' } }, (response) => {
-      if (!downloadBytes || response.statusCode !== 200) {
+    request = https.get(target, { agent, headers: { 'User-Agent': 'LocalRoute/'+require('../../package.json').version } }, (response) => {
+      if (downloadBytes && speedResponseError(response.statusCode)) {
+        response.resume(); finish(speedResponseError(response.statusCode)); return;
+      }
+      if (!downloadBytes) {
         response.resume(); finish(responseResult(response.statusCode)); return;
       }
       const bodyStarted = Date.now();
@@ -113,7 +119,8 @@ async function runVlessCheck({ uri, profile, executable, signal }) {
     const checked = await runWithInput(executable, ['check', '-c', 'stdin'], {input:JSON.stringify(config),signal});
     signal?.throwIfAborted();
     if (!checked.ok) throw new Error('Конфигурация проверки VLESS не прошла проверку движка.');
-    child = spawn(executable, ['run', '-c', 'stdin'], { windowsHide: true, cwd: path.dirname(executable), stdio: ['pipe','ignore','ignore'] });
+    child = spawnOwned(executable, ['run', '-c', 'stdin'], { windowsHide: true, cwd: path.dirname(executable), stdio: ['pipe','ignore','pipe'] });
+    child.stderr.resume();
     child.stdin.on('error', () => {}); child.stdin.end(JSON.stringify(config));
     let failed = false;
     child.once('error', () => { failed = true; });
@@ -130,4 +137,4 @@ async function runVlessCheck({ uri, profile, executable, signal }) {
     await terminateChild(child,{tree:false});
   }
 }
-module.exports = { responseResult, probeThroughProxy, runVlessCheck,checkProxyTargets,checkProxySpeed,downloadResult,freePort };
+module.exports = { responseResult, speedResponseError, probeThroughProxy, runVlessCheck,checkProxyTargets,checkProxySpeed,downloadResult,freePort };

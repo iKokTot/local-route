@@ -60,7 +60,10 @@ test('probe targets include every selected service and custom domain, also with 
 test('diagnostic configuration has only a loopback proxy and no direct fallback or TUN', () => {
   const config = createVlessCheckConfig(uri, 23456);
   assert.deepEqual(config.inbounds, [{ type: 'http', tag: 'diagnostics', listen: '127.0.0.1', listen_port: 23456 }]);
-  assert.equal(config.outbounds.length, 1);
+  assert.equal(config.outbounds.length, 2); // direct is DNS bootstrap only, never a routing fallback
+  assert.equal(config.dns.servers.find(s=>s.tag==='local-dns').detour,'direct');
+  assert(!config.dns.servers.some(s=>s.type==='local'));
+  assert.equal(config.route.rules,undefined);
   assert.equal(config.outbounds[0].type, 'vless');
   assert.equal(config.route.final, 'vless-out');
   assert.throws(() => createVlessCheckConfig(uri, 80));

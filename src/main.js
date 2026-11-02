@@ -18,11 +18,16 @@ const { detectVlessNetwork } = require('./core/network');
 const { proxySettings, proxySecret, proxyLink, portAvailable, listenerReady } = require('./core/telegram-proxy');
 const { createStateStore } = require('./core/state-store');
 const { createOperationCoordinator, checkOperation } = require('./core/operations');
-const { runCommand, runWithInput, terminateChild, inspectNetworkConflicts } = require('./platform/windows');
+const { runCommand, runWithInput, terminateChild, inspectNetworkConflicts,spawnOwned } = require('./platform/windows');
 const { publicCatalog } = require('./core/catalog');
 const { diagnosticReport } = require('./core/diagnostic-report');
 const { createLineSink } = require('./core/log-lines');
 const { prepareProbeSession, probeWithRetry } = require('./core/dpi-check');
+const {dpiResponse}=require('./core/dpi-response');
+const {createVpnHealth}=require('./core/vpn-health');
+const {probeThroughProxy}=require('./core/vless-check');
+const {createLibraryView}=require('./core/library-view');
+const publicLibraryView=createLibraryView({readLibrary:state=>readVlessLibrary(state)});
 const APP_VERSION = require('../package.json').version;
 let telegramProcess = null;
 let telegramBusy = false;
@@ -54,7 +59,7 @@ async function startTelegram(operation = activeOperation) {
       secret = proxySecret();
       writeState({ ...readState(), telegramSecret: safeStorage.encryptString(secret).toString('base64') });
     }
-    const child = spawn(executable, ['--host', '127.0.0.1', '--port', String(settings.port), '--secret', secret, '--pool-size', '2'], { windowsHide: true, cwd: path.dirname(executable), stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawnOwned(executable, ['--host', '127.0.0.1', '--port', String(settings.port), '--secret', secret, '--pool-size', '2'], { windowsHide: true, cwd: path.dirname(executable), stdio: ['ignore', 'pipe', 'pipe'] });
     telegramProcess = child;
     captureProcessOutput(child, 'tgws', [secret]);
     child.once('error', (error) => { telegramError = error.message; if (telegramProcess === child) telegramProcess = null; });
@@ -81,6 +86,7 @@ let vlessProcess = null;
 let vlessHealthPort = null;
 let lastVlessCheck = null;
 let vlessError = '';
+let vlessResumePending=false;
 let autoStartWarning = '';
 let vlessRoutingDomainsKey = null;
 function dpiRoutingDomains(state) {
@@ -103,6 +109,16 @@ let logFlushTimer = null;
 const expectedStops = new WeakSet();
 let activeOperation = null;
 const operations = createOperationCoordinator();
+const vpnHealth=createVpnHealth({
+  check:(port,signal)=>probeThroughProxy('https://www.cloudflare.com/cdn-cgi/trace',port,{signal,timeoutMs:6000}),
+  canCheck:()=>!activeOperation && !isQuitting,
+  networkKey:()=>JSON.stringify(Object.entries(require('node:os').networkInterfaces()).filter(([name])=>name!=='LocalRouteVless')),
+  changed:onVpnHealthChanged
+});
+function onVpnHealthChanged(){
+  if(vlessResumePending && vpnHealth.snapshot().status==='healthy'){vlessResumePending=false;vlessError='';}
+  publishProgress();
+}
 let stoppingPromise = null;
 let stateStore;
 let networkConflicts = { proxyEnabled: false, tunnelNames: [] };
@@ -166,15 +182,23 @@ function decodeVlessUri(state) {
   try { return safeStorage.decryptString(Buffer.from(state.vlessSecret, 'base64')); } catch { return ''; }
 }
 async function stopVless({ silent = false } = {}) {
+  vlessResumePending=false;
+  vpnHealth.stop();
   const child = vlessProcess;
   if (child) expectedStops.add(child);
   if (child) await terminateChild(child,{tree:false});
   if (vlessProcess === child) vlessProcess = null;
+  if (child) await clearVpnDnsCache();
   vlessHealthPort=null;lastVlessCheck=null;vlessRoutingDomainsKey=null;
   if(!silent)vlessError='';
   cleanupLegacyVlessFiles();
   if (!silent) pushLog('VLESS-маршрутизация остановлена.');
   return { vlessActive: false };
+}
+async function clearVpnDnsCache() {
+  if(process.platform!=='win32')return;
+  try { await runCommand('ipconfig.exe',['/flushdns'],{timeoutMs:1500}); }
+  catch { pushLog('Не удалось обновить DNS-кэш Windows. Если исключения не применились, полностью закройте и откройте браузер.'); }
 }
 function cleanupLegacyVlessFiles() {
   const directory = path.dirname(vlessConfigPath());
@@ -204,14 +228,14 @@ async function startVless(operation = activeOperation) {
   checkOperation(operation);
   let config;
   const dpiDomains=dpiRoutingDomains(state);
-  try { config = createSingBoxConfig(uri, state.vless, { ...network, diagnosticPort, dpiDomains }); } catch (error) { return { ok: false, message: `VLESS-профиль некорректен: ${error.message}` }; }
+  try { config = createSingBoxConfig(uri, state.vless, { ...network, diagnosticPort, dpiDomains, exclusionCachePath:path.join(app.getPath('userData'),'runtime','vpn-exclusions.db') }); } catch (error) { return { ok: false, message: `VLESS-профиль некорректен: ${error.message}` }; }
   pushLog(network.ipv6 ? 'VLESS: IPv4 и IPv6, внешний IPv6 подтверждён на основном подключении.' : 'VLESS: используется IPv4; внешний IPv6 на основном подключении не подтверждён.');
   const check = await runWithInput(executable, ['check', '-c', 'stdin'], { input: JSON.stringify(config), signal: operation?.signal });
   checkOperation(operation);
   if (!check.ok) {
     return { ok: false, message: 'VLESS-конфигурация не прошла проверку движка. Проверьте параметры ссылки.' };
   }
-  const child = spawn(executable, ['run', '-c', 'stdin'], { windowsHide: true, cwd: path.dirname(executable), stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = spawnOwned(executable, ['run', '-c', 'stdin'], { windowsHide: true, cwd: path.dirname(executable), stdio: ['pipe', 'pipe', 'pipe'] });
   child.stdin.on('error', () => {}); child.stdin.end(JSON.stringify(config));
   vlessProcess = child;
   vlessHealthPort=diagnosticPort;lastVlessCheck=null;
@@ -221,6 +245,7 @@ async function startVless(operation = activeOperation) {
     if (!expectedStops.has(child)) {
       vlessError='VPN неожиданно отключён. Трафик может идти напрямую. Запустите VPN повторно или проверьте журнал.';
       lastVlessCheck=null;
+      vpnHealth.stop();
       pushLog(`VLESS неожиданно завершился: ${code ?? 'сигнал'}. ${vlessError}`);
     }
     if (vlessProcess === child) vlessProcess = null;
@@ -228,7 +253,9 @@ async function startVless(operation = activeOperation) {
   });
   try { await waitForListener(child,diagnosticPort,{signal:operation?.signal}); }
   catch(error) { await stopVless({silent:true});checkOperation(operation);return {ok:false,message:error.message}; }
+  await clearVpnDnsCache();
   checkOperation(operation);
+  vpnHealth.start(diagnosticPort);
   vlessRoutingDomainsKey=JSON.stringify([...dpiDomains].sort());
   const next = { ...readState(), vlessActive: vlessIsRunning() };
   writeState(next); pushLog(state.vless.mode === 'exclude' ? `VPN включён: весь внешний трафик через сервер, ${state.vless.excludedDomains.length} доменов и ${state.vless.excludedApps.length} приложений напрямую.` : state.vless.mode === 'all' ? 'VLESS включён: весь интернет направляется в туннель.' : `VLESS включён: ${state.vless.domains.length} доменов направляются в туннель.`);
@@ -254,7 +281,7 @@ function pushLog(message) {
 function captureProcessOutput(child, prefix, secrets = []) {
   for (const stream of [child.stdout, child.stderr]) {
     if (!stream) continue;
-    const sink = createLineSink((line) => pushLog(`[${prefix}] ${line}`), secrets);
+    const sink = createLineSink((line) => {if(!/^LR_SUPERVISOR_CHILD=\d+$/.test(line))pushLog(`[${prefix}] ${line}`);}, secrets);
     stream.on('data', sink); stream.once('end', sink.end);
   }
 }
@@ -285,7 +312,7 @@ async function otherWinwsPids({ force = false, signal } = {}) {
   if (!force && now - externalWinwsCache.checkedAt < 2500) return externalWinwsCache.pids;
   try {
     const rows = await runCommand('tasklist.exe', ['/FI', 'IMAGENAME eq winws.exe', '/FO', 'CSV', '/NH'], {signal});
-    const pids = rows.split(/\r?\n/).map((line) => /^"winws\.exe","(\d+)"/i.exec(line)?.[1]).filter(Boolean).map(Number).filter((pid) => pid !== engineProcess?.pid);
+    const pids = rows.split(/\r?\n/).map((line) => /^"winws\.exe","(\d+)"/i.exec(line)?.[1]).filter(Boolean).map(Number).filter((pid) => pid !== engineProcess?.pid && pid !== engineProcess?.managedPid);
     externalWinwsCache = { checkedAt: now, pids };
     return pids;
   } catch {
@@ -339,10 +366,10 @@ function probe(url, { timeoutMs = 6500, signal, lookup } = {}) {
     const startedAt = Date.now();
     let settled = false;
     const finish = (success, detail, code) => { if (!settled) { settled = true; clearTimeout(timer); resolve({ success, detail, code, durationMs: Date.now() - startedAt }); } };
-    const request = https.get(url, { signal, lookup, agent: false, timeout: Math.max(1000, timeoutMs - 800), headers: { 'User-Agent': 'LocalRoute/0.15.2' } }, (response) => {
+    const request = https.get(url, { signal, lookup, agent: false, timeout: Math.max(1000, timeoutMs - 800), headers: { 'User-Agent': 'LocalRoute/'+APP_VERSION } }, (response) => {
       response.resume();
-      const success = response.statusCode >= 200 && response.statusCode < 500;
-      finish(success, `HTTP ${response.statusCode}`);
+      const result=dpiResponse(url,response.statusCode);
+      finish(result.success,result.detail);
     });
     const timer = setTimeout(() => { request.destroy(); finish(false, `Тайм-аут ${(timeoutMs / 1000).toLocaleString('ru-RU')} с`, 'ETIMEDOUT'); }, timeoutMs);
     request.once('timeout', () => { request.destroy(); finish(false, 'Тайм-аут соединения', 'ETIMEDOUT'); });
@@ -420,9 +447,9 @@ async function startEngine(operation = activeOperation) {
   }
   const args = buildEngineArgs({ engineRoot: engineRoot(), hostListPath: hostList, googleHostListPath: googleHostList, generalHostListPath: generalHostList, telegramIpSetPath: telegramAddresses.length ? telegramIpSet : undefined, profile: state.profile });
   try {
-    const child = spawn(executable, args, { windowsHide: true, cwd: path.dirname(executable), stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawnOwned(executable, args, { windowsHide: true, cwd: path.dirname(executable), stdio: ['ignore', 'pipe', 'pipe'] });
     engineProcess = child;
-    const writeEngineOutput = (chunk) => String(chunk).split(/\r?\n/).map((line) => line.trim()).filter(Boolean).forEach((line) => pushLog(`[winws] ${line}`));
+    const writeEngineOutput = (chunk) => String(chunk).split(/\r?\n/).map((line) => line.trim()).filter(line=>line && !/^LR_SUPERVISOR_CHILD=\d+$/.test(line)).forEach((line) => pushLog(`[winws] ${line}`));
     engineProcess.stdout?.on('data', writeEngineOutput);
     engineProcess.stderr?.on('data', writeEngineOutput);
     child.once('error', (error) => { pushLog(`Ошибка запуска: ${error.message}`); if (engineProcess === child) engineProcess = null; });
@@ -454,16 +481,16 @@ function readState() { return store().read(); }
 function writeState(next, options) { store().write(next, options); }
 function publicState(next) {
   const { vlessSecret, vlessLibrarySecret, serverVault, telegramSecret, ...safe } = next;
-  let library;
+  let view;
   let libraryWarning='';
-  try {library=readVlessLibrary(next);}
-  catch {library=normalizeLibrary();libraryWarning='Не удалось открыть зашифрованный список серверов. Исходные данные сохранены. Для восстановления потребуется исходная ссылка или подписка.';}
   const current = decodeVlessUri(next);
-  safe.vlessServers = library.profiles.map(({id,name,server,port,protocol,supported,error,check}) => ({id,name,server,port,protocol,supported,error,check,selected:id===serverId(current)}));
-  safe.vlessSubscriptionSaved = Boolean(library.source);
-  safe.vlessSubscriptions = library.groups.map(({id,name,source,profiles,usage,updatedAt})=>({id,name,usage,updatedAt,canRefresh:Boolean(source),serverIds:profiles.map(item=>item.id)}));
+  try {view=publicLibraryView(next,serverId(current));}
+  catch {view={servers:[],subscriptions:[],hasSource:false};libraryWarning='Не удалось открыть зашифрованный список серверов. Исходные данные сохранены. Для восстановления потребуется исходная ссылка или подписка.';}
+  safe.vlessServers = view.servers;
+  safe.vlessSubscriptionSaved = view.hasSource;
+  safe.vlessSubscriptions = view.subscriptions;
   safe.platform = 'windows';
-  return { ...safe, vpnCheck:lastVlessCheck?.serverId===serverId(current) ? lastVlessCheck : null, appVersion: APP_VERSION, catalog: publicCatalog(), operation: activeOperation ? { kind: activeOperation.kind, progress: activeOperation.progress, cancelled: activeOperation.cancelled } : null,
+  return { ...safe, vpnHealth:vpnHealth.snapshot(), vpnCheck:lastVlessCheck?.serverId===serverId(current) ? lastVlessCheck : null, appVersion: APP_VERSION, catalog: publicCatalog(), operation: activeOperation ? { kind: activeOperation.kind, progress: activeOperation.progress, cancelled: activeOperation.cancelled } : null,
     storageWarning: stateStore?.warning || libraryWarning, autoStartWarning,vlessError, telegram: proxySettings(next.telegram), telegramActive: telegramRunning(), telegramBusy, telegramError, active: engineIsRunning(), vlessActive: vlessIsRunning() };
 }
 function profilesTargetSame(left, right) {
@@ -612,8 +639,9 @@ app.whenReady().then(async () => {
   if (process.platform === 'win32') app.setAppUserModelId('com.localroute.app');
   createTray();
   powerMonitor?.on('resume',()=>{
+    vpnHealth.invalidate('resume');
     lastVlessCheck=null;
-    if(vlessIsRunning())vlessError='Компьютер вышел из сна. Проверьте подключение к серверу: прежняя проверка больше не актуальна.';
+    if(vlessIsRunning()){vlessResumePending=true;vlessError='Компьютер вышел из сна. Проверьте подключение к серверу: прежняя проверка больше не актуальна.';}
     refreshDiagnostics({force:true}).catch(()=>{});
     publishProgress();
   });
@@ -673,7 +701,7 @@ function trustedEvent(event) {
   catch { return false; }
 }
 managedChannels.add('launch:save');
-managedChannels.add('vless:stop');
+// Stop must not queue behind the VPN operation it needs to cancel.
 function registerIpc(channel, callback) {
   ipcMain.handle(channel, async (event, ...args) => {
     if (!trustedEvent(event)) throw new Error('Недопустимый источник команды.');
@@ -694,6 +722,12 @@ function publishProgress() {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('operation:progress', activeOperation ? {kind:activeOperation.kind,progress:activeOperation.progress} : null);
 }
 
+registerIpc('route:explain', (_event, site) => {
+  try {
+    const state = readState();
+    return {ok:true, ...require('./core/route-explanation').explainRoute(site, {profile:state.vless, vpnActive:vlessIsRunning(), dpiActive:engineIsRunning(), dpiDomains:state.profile.domains})};
+  } catch (error) { return {ok:false,message:error.message}; }
+});
 registerIpc('state:read', () => { if(mainWindowReady)refreshDiagnostics().catch(() => {}); const state = { ...readState(), active: engineIsRunning(), autoStart: cachedAutoStart, vlessActive: vlessIsRunning() }; return { ...publicState(state), diagnostics: diagnostics(state), logs: readLogs() }; });
 registerIpc('profile:save', async (_event, raw) => {
   if (engineIsRunning()) return { ok: false, message: 'Остановите DPI перед сохранением профиля.' };
@@ -980,7 +1014,11 @@ registerIpc('vless:save', async (_event, raw) => {
   } catch (error) { return { ok: false, message: error.message || 'Не удалось сохранить VLESS-профиль.' }; }
 });
 registerIpc('vless:stop', async () => {
+  const operation=activeOperation;
+  const cancels=operation && (operation.kind.startsWith('vless') || ['network:startAll','autostart'].includes(operation.kind));
+  if(cancels)operations.cancel();
   await stopVless();
+  if(cancels)await operation.done;
   return {ok:true,state:publicState(readState()),message:'VPN остановлен.'};
 });
 registerIpc('vless:toggle', async () => {
@@ -1049,7 +1087,7 @@ registerIpc('engine:testStrategy', async (_event, strategy) => {
     if (operation.cancelled) return { ok: false, message: 'Проверка остановлена пользователем.' };
     results.forEach((result) => pushLog(`${result.label}: ${result.success ? 'успешно' : 'ошибка'} — ${result.detail}, ${result.durationMs} мс.`));
     const passed = results.every((result) => result.success);
-    const message = passed ? `Стратегия «${strategy}» прошла тест.` : `Стратегия «${strategy}» не прошла тест.`;
+    const message = (passed ? `Стратегия «${strategy}» прошла HTTP-проверку; видео и голос не проверялись.` : `Стратегия «${strategy}» не прошла тест.`)+' Тест завершён, DPI остановлен.';
     const verified = passed
       ? { ...readState(), profile, verifiedStrategy: strategy, active: false }
       : { ...readState(), profile: state.profile, verifiedStrategy: state.verifiedStrategy, active: false };
@@ -1111,7 +1149,7 @@ registerIpc('engine:autoSelect', async () => {
           const next = { ...readState(), profile, active: true, verifiedStrategy: strategy };
           writeState(next); pushLog(`Автоподбор выбрал стратегию: ${strategy}.`);
           keepEngine = true;
-          return { ok: true, state: { ...publicState(next), diagnostics: diagnostics(next), logs: engineLog }, message: `Подобрана стратегия: ${strategy}.` };
+          return { ok: true, state: { ...publicState(next), diagnostics: diagnostics(next), logs: engineLog }, message: `Подобрана стратегия: ${strategy}. HTTP-проверка пройдена; проверьте видео и голос в приложениях.` };
         }
       } finally {
         if (!keepEngine) await stopEngine({ silent: true, recover: false });

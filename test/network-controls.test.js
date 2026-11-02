@@ -18,6 +18,7 @@ function load({ vlessCheck, commands, networkDetect, spawnChild, checkInput, moc
   const context = vm.createContext({
     require: (name) => name === 'electron' ? electron : name === './core/subscriptions' && subscriptionDownload ? {...mainRequire(name),downloadSubscription:subscriptionDownload} : name === './core/runtime-readiness' ? {waitForListener:async()=>{}} : name === './core/dpi-check' ? { ...mainRequire(name),prepareProbeSession:prepareDpi || (async()=>({errors:[],lookupFor:()=>undefined})) } : name === 'node:https' && httpsMock ? httpsMock : name === 'node:fs' && mockFs ? mockFs : name === './core/network' && networkDetect ? {detectVlessNetwork:networkDetect} : name === './core/vless-check' && vlessCheck ? {...mainRequire(name), runVlessCheck: vlessCheck } : name === './platform/windows' ? {
       runCommand: commands || (async (...args) => { tasks.push(args); return ''; }), runWithInput: checkInput || (async () => ({ok:true})),
+      spawnOwned:spawnChild || (()=>{throw new Error('No real processes in tests');}),
       inspectNetworkConflicts: async () => ({proxyEnabled:false,tunnelNames:[]}), terminateChild: async child => { if(child) child.exitCode=0; }
     } : name === 'node:child_process' ? { spawn: spawnChild || (() => { throw new Error('No real processes in tests'); }) } : mainRequire(name),
     process: { platform: 'win32', argv: [], resourcesPath: 'C:\\Mock\\resources', execPath: 'C:\\Mock\\Local Route.exe' }, __dirname: path.dirname(mainPath), Buffer, AbortController, AbortSignal, setTimeout, clearTimeout, console
@@ -42,6 +43,15 @@ function load({ vlessCheck, commands, networkDetect, spawnChild, checkInput, moc
   return { handlers, context, tasks, appEvents };
 }
 
+test('Route inspection uses trusted IPC and current saved profile without starting processes', async()=>{
+  const {handlers,context}=load();
+  vm.runInContext(`fixture.vless=createVlessProfile({mode:'exclude',excludedDomains:['avito.ru']});vlessProcess={exitCode:null,killed:false};`,context);
+  const reply=await handlers.get('route:explain')(null,'https://www.avito.ru/item?secret=hidden');
+  assert.equal(reply.ok,true);assert.equal(reply.route,'direct');assert.equal(reply.rule,'avito.ru');
+  assert.ok(!JSON.stringify(reply).includes('hidden'));
+  assert.equal((await handlers.get('route:explain')(null,{})).ok,false);
+  assert.equal(vm.runInContext('calls.length',context),0);
+});
 test('Подписка зашифрована; выбор сервера сохраняет маршруты; ошибка не заменяет рабочие данные', async () => {
   let valid = true;
   const {handlers, context} = load({checkInput:async()=>({ok:valid})});
@@ -287,14 +297,24 @@ test('trusted IPC accepts the local page fragment and rejects remote or child fr
   assert.equal(vm.runInContext('originalTrustedEvent({sender:contents,senderFrame:frame})',context),false);
 });
 
-test('DPI deliberately retains the accepted Flowseal-style HTTP 200-499 policy',async()=>{
+test('DPI rejects HTTP errors for endpoints without an explicit expected error status',async()=>{
   const {EventEmitter}=require('node:events');
   let statusCode=200;
   const {context}=load({httpsMock:{get(_url,_options,callback){const request=new EventEmitter();request.destroy=()=>{};setImmediate(()=>callback({statusCode,resume(){}}));return request;}}});
   for(const code of [200,403,429,499,500]){
     statusCode=code;const result=await vm.runInContext("probe('https://fixture.invalid')",context);
-    assert.equal(result.success,code<500);
+    assert.equal(result.success,code<400);
   }
+});
+
+test('successful health clears only a pending resume warning, never an unrelated persistent error',()=>{
+  const {context}=load();
+  vm.runInContext(`vlessResumePending=true;vlessError='resume warning';vpnHealth.snapshot=()=>({status:'degraded'});onVpnHealthChanged();`,context);
+  assert.equal(vm.runInContext('vlessError',context),'resume warning');
+  vm.runInContext(`vpnHealth.snapshot=()=>({status:'healthy'});onVpnHealthChanged();`,context);
+  assert.equal(vm.runInContext('vlessError',context),'');
+  vm.runInContext(`vlessError='unrelated persistent error';onVpnHealthChanged();`,context);
+  assert.equal(vm.runInContext('vlessError',context),'unrelated persistent error');
 });
 
 test('repeated quit requests still wait for process cleanup before exiting',async()=>{
@@ -306,6 +326,19 @@ test('repeated quit requests still wait for process cleanup before exiting',asyn
   vm.runInContext('releaseQuit()',context);
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(tasks.filter(task=>task==='quit').length,1);
+});
+
+test('stop VPN cancels its pending start without stopping unrelated components',async()=>{
+  const {handlers,context}=load();
+  vm.runInContext(`fixture.vlessConfigured=true;engineProcess={exitCode:null,killed:false};
+    startVless=async()=>{await new Promise(resolve=>{globalThis.releaseVpnStart=resolve;});checkOperation(activeOperation);calls.push('late-vpn-start');return {ok:true};};
+    stopVless=async()=>{calls.push('stop-vpn');vlessProcess=null;};`,context);
+  const starting=handlers.get('vless:start')(null);await new Promise(setImmediate);
+  const stopping=handlers.get('vless:stop')(null);await new Promise(setImmediate);
+  vm.runInContext('releaseVpnStart()',context);
+  assert.equal((await starting).ok,false);assert.equal((await stopping).ok,true);
+  assert.equal(vm.runInContext('calls.includes("late-vpn-start")',context),false);
+  assert.equal(vm.runInContext('engineIsRunning()',context),true);
 });
 
 test('DNS failure does not stop working DPI or erase the saved strategy',async()=>{

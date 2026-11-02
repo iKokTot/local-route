@@ -95,6 +95,8 @@ h3 { margin: 0; font-size: 19px; line-height: 1.35; font-weight: 500; }
 .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .setting-description, .field-hint { margin: 12px 0 0; color: var(--on-surface-variant); font-size: 13px; line-height: 1.6; }
 .field-hint { margin-top: 6px; font-size: 12px; }
+.command-state-hint { min-height: 3.2em; }
+@media (max-width:760px) { .command-state-hint { min-height: 4.8em; } }
 .muted { color: var(--on-surface-variant); }
 .info-note { padding: 14px 16px; margin-top: 20px; border-radius: 12px; background: var(--surface-container); color: var(--on-surface-variant); font-size: 12px; line-height: 1.6; }
 .switch { position: relative; display: inline-flex; flex-shrink: 0; width: 52px; height: 32px; }
@@ -178,6 +180,9 @@ summary .counter { margin-left: 6px; }
 .test-result.fail { color: var(--error); background: var(--error-container); }
 .test-result.warning { color: var(--warning); background: #3e3420; }
 .vless-test-results, .vless-check-list { display: grid; gap: 8px; }
+#vpn-check-results > .setting-description { margin: 0 0 12px; }
+#vpn-check-results > .button { max-width: 100%; white-space: normal; }
+#vpn-check-results > .vless-test-results { margin-top: 16px; gap: 12px; }
 .vless-check-list { max-height: 350px; overflow-y: auto; }
 .test-result span { display: block; margin-top: 4px; }
 .activity-log { display: grid; gap: 8px; max-height: 280px; overflow-y: auto; }
@@ -302,3 +307,4 @@ footer { margin-top: 32px; color: var(--on-surface-variant); font-size: 11px; }
 #launch-component-settings > p { grid-column: 1 / -1; }
 .launch-options { min-width: 0; align-content: start; }
 @media (max-width: 700px) { #launch-component-settings { grid-template-columns: 1fr; gap: 20px; } .launch-options legend { min-height: 0; } }
+#route-explanation { white-space: pre-line; overflow-wrap: anywhere; }

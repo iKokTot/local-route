@@ -1,5 +1,4 @@
 const crypto = require('node:crypto');
-const https = require('node:https');
 const { parseProxyInput } = require('./vless');
 const LIMIT = 2 * 1024 * 1024;
 function parseSubscription(body) {
@@ -38,27 +37,9 @@ function subscriptionUsage(header = '') {
   }
   return result;
 }
-function fetchSubscription(address, redirects = 0) {
-  return new Promise((resolve, reject) => {
-    let url;
-    try { url = new URL(address); if (url.protocol !== 'https:' || url.username || url.password) throw new Error(); }
-    catch { reject(new Error('Нужна HTTPS-ссылка подписки.')); return; }
-    const request = https.get(url, { headers: { 'User-Agent': 'LocalRoute/0.16 sing-box', Accept: 'text/plain, application/json' } }, (response) => {
-      if ([301, 302, 303, 307, 308].includes(response.statusCode)) {
-        response.resume();
-        if (redirects >= 3 || !response.headers.location) return reject(new Error('Слишком много перенаправлений.'));
-        resolve(fetchSubscription(new URL(response.headers.location, url).href, redirects + 1)); return;
-      }
-      if (response.statusCode !== 200) { response.resume(); reject(new Error(`Провайдер подписки ответил HTTP ${response.statusCode}.`)); return; }
-      let bytes = 0; const chunks = [];
-      response.on('data', (chunk) => { bytes += chunk.length; if (bytes > LIMIT) response.destroy(new Error('Подписка больше 2 МБ.')); else chunks.push(chunk); });
-      response.once('error', () => reject(new Error('Не удалось прочитать подписку.')));
-      response.once('end', () => resolve({ servers: parseSubscriptionSafe(Buffer.concat(chunks).toString('utf8')), usage: subscriptionUsage(response.headers['subscription-userinfo']), title: String(response.headers['profile-title'] || url.hostname).slice(0, 120) }));
-    });
-    const timer = setTimeout(() => request.destroy(), 15000);
-    request.once('close', () => clearTimeout(timer));
-    request.once('error', () => reject(new Error('Не удалось загрузить подписку. Проверьте ссылку и доступ к провайдеру.')));
-    function parseSubscriptionSafe(text) { try { return parseSubscription(text); } catch (error) { reject(error); return []; } }
-  });
+function fetchSubscription(address) {
+  // Compatibility wrapper: all downloads use the same redirect/size/deadline policy.
+  return Promise.resolve().then(()=>require('./subscriptions').downloadSubscription(address,{metadata:true}))
+    .then(({text,usage})=>({servers:parseSubscription(text),usage,title:new URL(address).hostname}));
 }
 module.exports = { parseSubscription, subscriptionUsage, fetchSubscription };

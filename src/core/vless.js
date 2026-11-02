@@ -1,4 +1,5 @@
 const { URL } = require('node:url');
+const {dnsServers}=require('./dns-policy');
 
 const VLESS_SERVICE_CATALOG = Object.freeze({
   tiktok: { label: 'TikTok', domains: ['tiktok.com', 'tiktokv.com', 'tiktokcdn.com', 'ibytedtos.com', 'byteoversea.com', 'musical.ly'], probe: 'https://www.tiktok.com/' },
@@ -58,27 +59,37 @@ function createVlessProfile({ services = ['tiktok', 'instagram'], customDomains 
   const exclusions = mode === 'exclude';
   return { mode: exclusions ? 'exclude' : mode === 'all' ? 'all' : 'selective', services: exclusions ? [] : selected, customDomains: exclusions ? [] : [...new Set(customDomains.map(normalizeDomain).filter(isDomain))], apps: exclusions ? [] : [...new Set(apps.map(normalizeProcessName).filter(Boolean))].sort(), domains: exclusions ? [] : [...new Set(domains)].sort(), excludedDomains: [...new Set(excludedDomains.map(normalizeDomain).filter(isDomain))].sort(), excludedApps: [...new Map(excludedApps.map(normalizeProcessName).filter(Boolean).map(name => [name.toLowerCase(), name])).values()].sort() };
 }
-function createSingBoxConfig(uri, rawProfile, { ipv6 = false, dpiDomains = [], diagnosticPort } = {}) {
+function createSingBoxConfig(uri, rawProfile, { ipv6 = false, dpiDomains = [], diagnosticPort, exclusionCachePath } = {}) {
   const outbound = { ...parseProxyInput(uri), tag: 'vless-out' };
   const profile = createVlessProfile(rawProfile);
   const selective = profile.mode === 'selective';
   const directDomains = [...new Set([...dpiDomains, ...(profile.mode === 'exclude' ? profile.excludedDomains : [])])];
+  // Give excluded sites a unique DNS identity instead of depending on a
+  // shared CDN IP reverse lookup or plaintext SNI (which ECH can hide).
+  // Only excluded domains use this pool; other traffic keeps ordinary DNS.
+  const excludedDns = profile.mode === 'exclude' && directDomains.length > 0;
   return {
     log: { level: 'warn', timestamp: true },
+    ...(excludedDns && exclusionCachePath ? {experimental:{cache_file:{enabled:true,path:exclusionCachePath,store_fakeip:true}}} : {}),
     dns: {
       reverse_mapping: true,
       servers: [
-        { type: 'https', tag: 'vless-dns', server: '1.1.1.1', server_port: 443, path: '/dns-query', detour: 'vless-out' },
-        { type: 'local', tag: 'local-dns' }
+        ...dnsServers(),
+        ...(excludedDns ? [{ type: 'fakeip', tag: 'excluded-dns', inet4_range: '198.19.0.0/16', ...(ipv6 ? {inet6_range:'fc00:198:19::/48'} : {}) }] : [])
       ],
-      rules: [...(directDomains.length ? [{ domain_suffix: directDomains, action: 'route', server: 'local-dns' }] : []), ...(selective && profile.domains.length ? [{ domain_suffix: profile.domains, action: 'route', server: 'vless-dns' }] : [])],
+      rules: [
+        ...(excludedDns ? [{ domain_suffix: directDomains, query_type: ['A', 'AAAA'], action: 'route', server: 'excluded-dns', rewrite_ttl: 60 }] : []),
+        ...(directDomains.length ? [{ domain_suffix: directDomains, action: 'route', server: 'local-dns' }] : []),
+        ...(profile.mode === 'exclude' && profile.excludedApps.length ? [{process_name:profile.excludedApps,action:'route',server:'local-dns'}] : []),
+        ...(selective && profile.domains.length ? [{ domain_suffix: profile.domains, action: 'route', server: 'vless-dns' }] : [])
+      ],
       final: selective ? 'local-dns' : 'vless-dns'
     },
     // Do not use 172.16/12 here: Docker, WSL and several VPN clients commonly
     // reserve it, causing Windows to reject the TUN address as already present.
     // 198.18/15 is the benchmarking range and is safe as an internal TUN subnet.
     inbounds: [{ type: 'tun', tag: 'local-route-tun', interface_name: 'LocalRouteVless', address: ['198.18.0.1/30', ...(ipv6 ? ['fdfe:dcba:9876::1/126'] : [])], auto_route: true, strict_route: true, stack: 'mixed', mtu: 1400 }, ...(diagnosticPort ? [{type:'http',tag:'local-route-health',listen:'127.0.0.1',listen_port:diagnosticPort}] : [])],
-    outbounds: [outbound, { type: 'direct', tag: 'direct' }],
+    outbounds: [outbound, { type: 'direct', tag: 'direct', domain_resolver: 'local-dns' }],
     route: {
       auto_detect_interface: true,
       default_domain_resolver: 'local-dns',
@@ -162,9 +173,9 @@ function createVlessCheckConfig(uri, port) {
   if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Некорректный порт проверки.');
   return {
     log: { level: 'error' },
-    dns: { servers: [{ type: 'local', tag: 'local-dns' }], final: 'local-dns' },
+    dns: { servers: dnsServers(), final: 'vless-dns' },
     inbounds: [{ type: 'http', tag: 'diagnostics', listen: '127.0.0.1', listen_port: port }],
-    outbounds: [{ ...parseProxyInput(uri), tag: 'vless-out' }],
+    outbounds: [{ ...parseProxyInput(uri), tag: 'vless-out' },{type:'direct',tag:'direct',domain_resolver:'local-dns'}],
     route: { auto_detect_interface: true, default_domain_resolver: 'local-dns', final: 'vless-out' }
   };
 }

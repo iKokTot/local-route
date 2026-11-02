@@ -129,7 +129,8 @@ function renderControls() {
   disable('#test-vless-speed', busy || !state.vlessActive || dirty('vless'), 'Сначала запустите VPN и сохраните изменения');
   disable('#start-vless', busy || (!state.vlessActive && (!state.vlessConfigured || dirty('vless'))), 'Сначала сохраните профиль VPN');
   disable('#toggle-vless', busy || state.vlessActive || !state.vlessConfigured || dirty('vless'), state.vlessActive ? 'VPN уже запущен' : 'Выберите сервер и сохраните профиль');
-  disable('#stop-vless',busy || !state.vlessActive,'VPN уже выключен или выполняется операция');
+  const vpnStarting=['vless:start','vless:toggle','network:startAll','autostart'].includes(state.operation?.kind) || pending?.kind==='vless';
+  disable('#stop-vless',(!state.vlessActive && !vpnStarting) || pending?.kind==='stop','VPN уже выключен');
   disable('#start-dpi', busy || (!state.active && (!state.verifiedStrategy || dirty('dpi'))), 'Подберите стратегию на вкладке «YouTube и Discord»');
   disable('#start-saved-dpi', busy || state.active || !state.verifiedStrategy || dirty('dpi'), 'Сначала подберите и сохраните стратегию');
   disable('[data-auto-select], .test-strategy', busy || dirty('dpi') || (!state.profile.services.length && !state.profile.customDomains.length), 'Сначала выберите YouTube или Discord и сохраните сервисы');
@@ -140,6 +141,8 @@ function renderControls() {
   disable('#start-telegram', busy || (!state.telegramActive && dirty('telegram')), 'Сначала сохраните настройки Telegram');
   disable('#telegram-stop, #telegram-connect, #telegram-copy', busy || !state.telegramActive, 'Сначала запустите прокси');
   const launch = currentLaunchSettings().all;
+  $('#start-all').textContent='Запустить выбранное';
+  $('#start-all').title='Состав запуска выбирается в настройках приложения';
   const canStart = (launch.dpi && !state.active && state.verifiedStrategy) || (launch.vpn && !state.vlessActive && state.vlessConfigured) || (launch.telegram && !state.telegramActive);
   disable('#start-all', busy || !canStart || (launch.dpi && dirty('dpi')) || (launch.vpn && dirty('vless')) || (launch.telegram && dirty('telegram')), 'Выберите компоненты в настройках запуска и сохраните их изменения');
   const canStop = state.active || state.vlessActive || state.telegramActive || Boolean(pending) || Boolean(state.operation);
@@ -175,6 +178,16 @@ function renderControls() {
     }, 180);
   }
   all('[data-page-panel]').forEach((panel) => panel.setAttribute('aria-busy', String(busy)));
+  // Disabled controls do not reliably expose title tooltips to keyboard/touch.
+  // One stable message per command group, without shifting the button row.
+  for(const group of all('.service-command-bar')) {
+    let hint=group.nextElementSibling;
+    if(!hint?.classList.contains('command-state-hint')) {
+      hint=document.createElement('p');hint.className='field-hint command-state-hint';hint.setAttribute('role','status');group.after(hint);
+    }
+    const kind=group.querySelector('#toggle-vless')?'vless':group.querySelector('#telegram-start')?'telegram':'dpi';
+    hint.textContent=busy ? 'Выполняется операция. Общая остановка доступна на вкладке «Обзор».' : kind==='vless' ? (dirty('vless')?'Сохраните изменения профиля перед запуском и проверкой.':!state.vlessConfigured?'Сначала добавьте сервер в разделе «Серверы и подписки».':state.vlessActive?'Для изменения сервера или исключений сначала остановите VPN.':'Профиль сохранён. Можно запустить VPN или проверить сервер.') : kind==='telegram' ? (dirty('telegram')?'Сначала сохраните параметры прокси.':state.telegramActive?'Прокси готов. Откройте Telegram и подтвердите подключение.':'Сначала запустите прокси, затем откройте Telegram.') : (dirty('dpi')?'Сначала сохраните выбранные сервисы.':state.active?'DPI запущен. Для смены профиля сначала остановите его.':'Можно запустить сохранённый профиль или подобрать новый.');
+  }
 }
 function renderState() {
   if (!state) return;
@@ -188,17 +201,19 @@ function renderState() {
   const startup = currentLaunchSettings().auto;
   const ready = [startup.dpi && 'DPI', startup.vpn && 'VPN', startup.telegram && 'Telegram'].filter(Boolean);
   status('#dpi-run-state', state.active ? 'Запущен' : (state.verifiedStrategy ? 'Готов к запуску' : 'Нужен подбор'), state.active ? 'active' : '');
-  status('#vless-run-state', state.vlessError ? (state.vlessActive ? 'Нужна проверка' : 'VPN отключён') : state.vlessActive ? 'Запущен' : (state.vlessConfigured ? 'Готов к запуску' : 'Не настроен'), state.vlessError ? 'error' : state.vlessActive ? 'active' : '');
+  const health=state.vlessActive?state.vpnHealth:null;
+  const healthLabel=health?.status==='healthy'?'HTTPS проверен':health?.status==='degraded'?'Сеть недоступна':health?.status==='checking'?'Проверяю сеть':health && health.status!=='off'?'Нужна проверка':null;
+  status('#vless-run-state', state.vlessError ? (state.vlessActive ? 'Нужна проверка' : 'VPN отключён') : state.vlessActive ? (healthLabel || 'Запущен') : (state.vlessConfigured ? 'Готов к запуску' : 'Не настроен'), state.vlessError || health?.status==='degraded' ? 'error' : state.vlessActive && (!health || health.status==='healthy') ? 'active' : health?'waiting':'');
   const tgStatus = state.telegramBusy ? 'Запускается…' : (state.telegramActive ? 'Прокси готов' : (state.telegramError ? 'Ошибка прокси' : 'Выключен'));
   const tgLevel = state.telegramBusy ? 'waiting' : (state.telegramActive ? 'active' : (state.telegramError ? 'error' : ''));
   status('#telegram-run-state', tgStatus, tgLevel);
   status('#telegram-state', tgStatus, tgLevel);
-  status('#vless-state', state.vlessActive ? 'Запущен' : (state.vlessConfigured ? 'Профиль сохранён' : 'Не настроен'), state.vlessActive ? 'active' : '');
-  status('#dpi-strategy-state', state.verifiedStrategy ? 'Подтверждена' : 'Не подобрана', state.verifiedStrategy ? 'active' : '');
+  status('#vless-state', state.vlessActive ? (healthLabel || 'Запущен') : (state.vlessConfigured ? 'Профиль сохранён' : 'Не настроен'), health?.status==='degraded'?'error':state.vlessActive ? 'active' : '');
+  status('#dpi-strategy-state', state.verifiedStrategy ? (isAndroid()?'Подтверждена':'HTTP проверен') : 'Не подобрана', state.verifiedStrategy ? 'active' : '');
   $('#dpi-detail').textContent = state.active ? `Стратегия: ${strategyLabel(state.profile.strategy)}.` : (state.verifiedStrategy ? `Сохранена стратегия: ${strategyLabel(state.verifiedStrategy)}.` : 'Выберите сервисы и запустите подбор стратегии.');
   $('#dpi-strategy-description').textContent = state.verifiedStrategy ? `Сохранена стратегия «${strategyLabel(state.verifiedStrategy)}». Повторный подбор проверит стратегии заново и запустит подходящую.` : 'Автоподбор проверит стратегии по очереди и включит первую подходящую.';
   const allTraffic = state.vless?.mode !== 'selective';
-  $('#vless-detail').textContent = state.vlessError ? (state.vlessActive ? 'После сна проверьте соединение с сервером.' : 'Трафик может идти напрямую. Проверьте VPN.') : state.vlessConfigured ? (allTraffic ? 'Весь трафик через VPN, кроме исключений, локальной сети и TGWs.' : 'Выбранные сайты и приложения через ваш сервер.') : 'Добавьте сервер и настройте исключения из VPN.';
+  $('#vless-detail').textContent = state.vlessError ? (state.vlessActive ? state.vlessError : 'Трафик может идти напрямую. Проверьте VPN.') : health?.status==='degraded' ? 'Процесс работает, но HTTPS через сервер не отвечает. Проверьте сеть или сервер.' : state.vlessConfigured ? (allTraffic ? 'Весь трафик через VPN, кроме исключений, локальной сети и TGWs.' : 'Выбранные сайты и приложения через ваш сервер.') : 'Добавьте сервер и настройте исключения из VPN.';
   $('#vless-detail').title=state.vlessError || '';
   $('#telegram-detail').textContent = state.telegramActive ? 'Прокси готов. Подтвердите подключение в Telegram.' : (state.telegramError || 'После запуска подключите прокси в Telegram.');
   $('#telegram-error').textContent = state.telegramError || '';
@@ -248,9 +263,11 @@ function renderServers() {
   $('#selected-server-summary').textContent=state.vlessConfigured ? 'Выбран: '+(selected?.name || 'сохранённый профиль') : 'Добавьте подключение в разделе «Серверы и подписки» ниже.';
   $('#vpn-server-count').textContent=String(servers.length || (state.vlessConfigured ? 1 : 0));
   const checked=state.vpnCheck;
-  const message=state.vlessError || (checked ? (checked.success ? 'Сервер проверен' : 'Проверка сервера не пройдена')+' · '+new Date(checked.checkedAt).toLocaleTimeString('ru-RU') : state.vlessActive ? 'Туннель готов. Доступность сервера ещё не проверена.' : 'VPN выключен.');
+  const health=state.vlessActive?state.vpnHealth:null;
+  const healthMessage=health?.status==='healthy'?'HTTPS через сервер проверен · '+new Date(health.checkedAt).toLocaleTimeString('ru-RU')+' · '+health.latency+' мс. Исключения и работа приложений не проверены.':health?.status==='degraded'?'HTTPS через сервер недоступен · '+new Date(health.checkedAt).toLocaleTimeString('ru-RU')+'. '+health.detail:health?.status==='checking'?'Туннель запущен. Проверяю HTTPS через сервер…':health && health.status!=='off'?'Туннель запущен. Нужна свежая проверка соединения.':null;
+  const message=state.vlessError || healthMessage || (checked ? (checked.success ? 'Сервер проверен' : 'Проверка сервера не пройдена')+' · '+new Date(checked.checkedAt).toLocaleTimeString('ru-RU') : state.vlessActive ? 'Туннель готов. Доступность сервера ещё не проверена.' : 'VPN выключен.');
   $('#vpn-connection-status').textContent=message;
-  $('#vpn-connection-status').dataset.state=state.vlessError ? 'failure' : checked ? checked.success?'success':'failure' : 'unchecked';
+  $('#vpn-connection-status').dataset.state=state.vlessError || health?.status==='degraded' ? 'failure' : health?.status==='healthy'?'success':health?'unchecked':checked ? checked.success?'success':'failure' : 'unchecked';
   const groups=state.vlessSubscriptions?.length ? state.vlessSubscriptions : servers.length ? [{id:'legacy',name:'Мои серверы',serverIds:servers.map(item=>item.id),canRefresh:state.vlessSubscriptionSaved}] : [];
   const signature=JSON.stringify([servers,groups,state.vlessConfigured]);
   $('#subscription-empty').classList.toggle('hidden',Boolean(servers.length || state.vlessConfigured));
@@ -271,6 +288,7 @@ function renderServers() {
 }
 function configurePlatform() {
   document.body.classList.toggle('platform-android',isAndroid());
+  $('#route-inspector').classList.toggle('hidden',isAndroid());
   $('#settings-version').textContent=state.appVersion;
   const general=$('#general-platform-settings');
   const startup=document.querySelector('.autostart-panel');
@@ -417,6 +435,16 @@ function addDomain(kind) {
 }
 async function handleAction(button) {
   const id = button.id;
+  if(id==='explain-route') {
+    const output=$('#route-explanation');
+    button.disabled=true;
+    try {
+      const reply=await window.localRoute.explainRoute($('#route-site').value);
+      output.textContent=reply.ok ? `${reply.domain} · ${reply.route==='vpn'?'Через VPN':'Напрямую'}\n${reply.reason}\n${reply.caveat}` : reply.message;
+    } catch { output.textContent='Не удалось получить правила. Повторите проверку.'; }
+    finally {button.disabled=false;}
+    return;
+  }
   if(id==='paste-subscription'){const reply=await window.localRoute.subscriptionClipboard();$('#subscription-input').value=reply.text || '';return;}
   if(id==='cancel-server-check'){await window.localRoute.cancelServerCheck();return;}
   if(id==='check-servers' || button.dataset.checkServer)return perform('server-check','Проверяю HTTPS через серверы…',()=>window.localRoute.checkServers(button.dataset.checkServer));
@@ -454,7 +482,11 @@ async function handleAction(button) {
   }
   if (id === 'save-dpi') return perform('save', 'Сохраняю сервисы DPI…', async () => {const result=await window.localRoute.saveProfile(clone(dpiDraft)); return result.ok===false ? result : {state:result,message:'Сервисы сохранены. Подберите стратегию для нового профиля.'};}, () => { resetDraft('dpi'); renderEditor('dpi'); });
   if (id === 'save-vless') return perform('vless', 'Проверяю и сохраняю профиль…', () => window.localRoute.saveVless(clone(vlessDraft)), () => { resetDraft('vless'); renderEditor('vless'); $('#vless-test-results').innerHTML = '<p class="setting-description">Исключения сохранены. Проверьте сервер; прямые сайты через VPN не тестируются.</p>'; });
-  if (id === 'stop-vless') return perform('vless','Останавливаю VPN…',()=>window.localRoute.stopVless());
+  if (id === 'stop-vless') {
+    if(pending?.kind==='stop')return;
+    pending=null;revision++;
+    return perform('stop','Останавливаю VPN…',()=>window.localRoute.stopVless());
+  }
   if (id === 'toggle-vless' || id === 'start-vless') return perform('vless', state.vlessActive ? 'Останавливаю VPN…' : 'Запускаю VPN…', () => state.vlessActive ? window.localRoute.stopVless() : window.localRoute.startVless());
   if (id === 'test-vless') return perform('vless', 'Проверяю сервер и выбранные сайты через VLESS…', () => window.localRoute.testVless());
   if (id === 'test-vless-speed') return perform('vless', 'Измеряю скорость через VPN: до 10 МБ, не более 20 секунд…', () => window.localRoute.testVlessSpeed());

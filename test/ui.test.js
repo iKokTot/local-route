@@ -53,6 +53,7 @@ async function open(initial = fixture(), viewport = { width: 1440, height: 1000 
       if (mock.delays?.[name]) await new Promise((resolve) => setTimeout(resolve, mock.delays[name]));
       if (mock.fault === name) throw new Error('Тестовая ошибка IPC');
       if (name === 'readState') { mock.readsCompleted = (mock.readsCompleted || 0) + 1; return snapshot(); }
+      if (name === 'explainRoute') return {ok:true,domain:'avito.ru',route:'direct',reason:'Совпало сохранённое исключение: avito.ru.',caveat:'Расчёт по правилам, не проверка IP.'};
       if (name === 'saveProfile') {
         mock.state.profile = { ...raw, domains: raw.services.flatMap((service) => [`${service}.com`]).concat(raw.customDomains) };
         mock.state.verifiedStrategy = null; mock.state.active = false;
@@ -524,6 +525,11 @@ test('quick VLESS save, connection check and refresh neither shift content nor f
   await page.evaluate(() => { mock.delays = { saveVless: 60, testVless: 60, readState: 60 }; });
   await page.locator('.vless-service[value="avito"]').check();
   for (const id of ['save-vless', 'test-vless']) {
+    // Bring the action on screen before measuring operation-induced movement.
+    // A physical click at an off-screen bounding box never starts the action.
+    await page.locator(`#${id}`).scrollIntoViewIfNeeded();
+    const method=id==='save-vless'?'saveVless':'testVless';
+    const callsBefore=await page.evaluate(name=>mock.calls.filter(call=>call.name===name).length,method);
     await page.evaluate(() => {
       mock.samples = []; mock.observing = true;
       const sample = () => {
@@ -537,7 +543,9 @@ test('quick VLESS save, connection check and refresh neither shift content nor f
     // Use a physical pointer click: locator.click scrolls sticky elements to
     // their original flow position before clicking, unlike a user's click.
     const target = await page.locator(`#${id}`).boundingBox();
-    await page.mouse.click(target.x + target.width / 2, target.y + target.height / 2); await idle(page);
+    await page.mouse.click(target.x + target.width / 2, target.y + target.height / 2);
+    await page.waitForFunction(({name,count})=>mock.calls.filter(call=>call.name===name).length>count,{name:method,count:callsBefore});
+    await idle(page);
     const samples = await page.evaluate(() => { mock.observing = false; return mock.samples; });
     assert(samples.length >= 2);
     assert(samples.every((sample) => sample.y === samples[0].y), `${id}: content shifted: ${JSON.stringify(samples)}`);
@@ -624,6 +632,61 @@ test('DNS errors show endpoint details and still allow the saved DPI strategy to
   assert.deepEqual(page.errors,[]);await page.close();
 });
 
+test('VPN speed results are separated from the action at desktop and narrow widths',async()=>{
+  for (const width of [1100,390]) {
+    const page=await open(fixture(),{width,height:844});await nav(page,'routes');
+    await page.locator('#vpn-check-results').evaluate(node=>{node.open=true;});
+    await page.locator('#vless-test-results').evaluate(node=>{node.innerHTML='<div class="test-result ok"><strong>Скорость через VPN · Ответ получен</strong><span>19.3 Мбит/с · 10 МБ · 4295 мс</span></div>';});
+    const button=await page.locator('#test-vless-speed').boundingBox();
+    const result=await page.locator('#vless-test-results').boundingBox();
+    assert(result.y-(button.y+button.height)>=15,'Result must not touch the speed button');
+    assert.deepEqual(page.errors,[]);await page.close();
+  }
+});
+
+test('VPN health distinguishes process, external reachability, stale checks and failures',async()=>{
+  for(const [health,label] of [
+    [{status:'unchecked'},'Нужна проверка'],[{status:'checking'},'Проверяю сеть'],
+    [{status:'healthy',checkedAt:new Date().toISOString(),latency:40},'HTTPS проверен'],
+    [{status:'stale'},'Нужна проверка'],[{status:'degraded',checkedAt:new Date().toISOString(),detail:'Тайм-аут'},'Сеть недоступна']
+  ]) {
+    const initial=fixture();initial.vlessActive=true;initial.vpnHealth=health;
+    const page=await open(initial);await nav(page,'routes');
+    assert.equal(await page.locator('#vless-state').textContent(),label);
+    if(health.status==='degraded')assert.equal(await page.locator('#vpn-connection-status').getAttribute('data-state'),'failure');
+    assert.deepEqual(page.errors,[]);await page.close();
+  }
+});
+
+test('command groups explain unavailable actions without relying on disabled tooltips',async()=>{
+  const initial=fixture();initial.vlessConfigured=false;initial.verifiedStrategy=null;
+  const page=await open(initial);await nav(page,'routes');
+  assert.match(await page.locator('[data-page-panel="routes"] .command-state-hint').textContent(),/Сначала добавьте сервер/);
+  await nav(page,'telegram');
+  assert.match(await page.locator('[data-page-panel="telegram"] .command-state-hint').textContent(),/Сначала запустите прокси/);
+  await page.evaluate(()=>{mock.progress({kind:'vless:checkServers'});});
+  assert.match(await page.locator('[data-page-panel="telegram"] .command-state-hint').textContent(),/Выполняется операция/);
+  assert.equal(await page.locator('.command-state-hint').count(),3);
+  assert.deepEqual(page.errors,[]);await page.close();
+});
+
+test('Route explanation is compact, readable and remains available during other operations',async()=>{
+  const page=await open();await nav(page,'routes');
+  assert.equal(await page.locator('#route-inspector').getAttribute('open'),null);
+  await page.locator('#route-inspector summary').click();
+  await page.locator('#route-site').fill('https://avito.ru/item');
+  await page.evaluate(()=>{mock.state.operation={kind:'telegram:start'};mock.progress(mock.state.operation);});
+  await page.locator('#explain-route').click();
+  await page.waitForFunction(()=>document.querySelector('#route-explanation').textContent.includes('Совпало'));
+  assert.match(await page.locator('#route-explanation').textContent(),/Напрямую/);
+  await page.locator('#route-inspector').screenshot({path:path.join(output,'route-inspector.png'),animations:'disabled'});
+  assert.equal(await page.locator('#explain-route').isEnabled(),true);
+  await page.evaluate(()=>{mock.fault='explainRoute';});
+  await page.locator('#explain-route').click();
+  await page.waitForFunction(()=>document.querySelector('#route-explanation').textContent.includes('Не удалось'));
+  assert.equal(await page.locator('#explain-route').isEnabled(),true);
+  assert.deepEqual(page.errors,[]);await page.close();
+});
 test('phone navigation stays at the bottom while only page content scrolls',async()=>{
   const page=await open(fixture(),{width:390,height:844});
   for(const target of ['control','lab','routes','telegram']){

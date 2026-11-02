@@ -1,16 +1,18 @@
 {
   "name": "local-route",
-  "version": "0.26.5",
+  "version": "0.29.0",
   "private": true,
   "description": "Local-first Windows companion for managing DPI-bypass profiles.",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
     "test": "node --test test/*.test.js",
-    "lint": "node --check src/main.js && node --check src/preload.js && node --check src/renderer/app.js"
+    "lint": "node --check src/main.js && node --check src/preload.js && node --check src/renderer/app.js",
+    "build:stage": "node scripts/stage-build.js",
+    "build:installer": "node scripts/package-installer.js"
   },
   "devDependencies": {
-    "electron": "^39.2.7",
+    "electron": "44.9.3",
     "electron-builder": "26.15.3",
     "playwright": "1.62.1",
     "rcedit": "^5.0.2"

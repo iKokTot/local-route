@@ -1,6 +1,14 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {downloadResult,probeThroughProxy}=require('../src/core/vless-check');
+const {downloadResult,probeThroughProxy,speedResponseError}=require('../src/core/vless-check');
+
+test('speed requires HTTP 200, never a redirect, empty or partial response',()=>{
+  assert.equal(speedResponseError(200),null);
+  for(const status of [204,206,301,302,403,429,500]) {
+    assert.equal(speedResponseError(status).success,false);
+    assert.equal(speedResponseError(status).statusCode,status);
+  }
+});
 
 test('speed includes connection setup and uses decimal megabits, not megabytes',()=>{
   const result=downloadResult(10000000,10000000,4000,2000);

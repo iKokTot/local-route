@@ -1,0 +1,8 @@
+{
+  "format": 1,
+  "components": {
+    "bin": {"sha256":"e0a0a352903902529347879ae46a679f26e73c89716104a4fb3cb4423386f6b6","files":20,"bytes":3313175},
+    "sing-box/sing-box-1.14.2-windows-amd64": {"sha256":"7154d6f882a27dbfdc897f5b48e4e62e12d0c31c52f1fff47e78821e2c68de5d","files":3,"bytes":91477288},
+    "tg-ws": {"sha256":"7de482d3747f016101e63c96b04c251ab16b4db797bb5f1c04cc9c2991a519d1","files":80,"bytes":33452706}
+  }
+}

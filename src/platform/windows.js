@@ -1,4 +1,27 @@
 const { execFile, spawn } = require('node:child_process');
+const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');
+
+function processHostPath(){
+  const root=path.resolve(__dirname,'../..');
+  const bundled=path.join(root,'native','LocalRoute.ProcessHost.exe');
+  if(fs.existsSync(bundled))return bundled;
+  const source=path.join(root,'native','ProcessHost.cs');
+  const hash=crypto.createHash('sha256').update(fs.readFileSync(source)).digest('hex');
+  return path.join(root,'artifacts/native',hash,'LocalRoute.ProcessHost.exe');
+}
+function spawnOwned(executable,args,options={}){
+  if(process.platform!=='win32')return spawn(executable,args,options);
+  const child=spawn(processHostPath(),[String(process.pid),executable,...args],{...options,windowsHide:true});
+  child.supervised=true;
+  let header='';
+  const metadata=chunk=>{
+    header=(header+String(chunk)).slice(0,1024);
+    const match=/LR_SUPERVISOR_CHILD=(\d+)\r?\n/.exec(header);
+    if(match){child.managedPid=Number(match[1]);child.stderr.off('data',metadata);}
+  };
+  child.stderr?.on('data',metadata);
+  return child;
+}
 
 function runWithInput(executable, args, { input = '', timeoutMs = 7000, signal } = {}) {
   return new Promise((resolve) => {
@@ -27,9 +50,18 @@ const stoppingChildren = new WeakMap();
 function terminateChild(child, options = {}) {
   if (!child) return Promise.resolve();
   if (stoppingChildren.has(child)) return stoppingChildren.get(child);
-  const stopping = stopChild(child,options).finally(() => stoppingChildren.delete(child));
+  const stopping = stopChild(child,options).then(()=>waitForOwnedExit(child)).finally(() => stoppingChildren.delete(child));
   stoppingChildren.set(child, stopping);
   return stopping;
+}
+async function waitForOwnedExit(child){
+  if(!child.supervised || !child.managedPid)return;
+  const deadline=Date.now()+5000;
+  while(true){
+    try {process.kill(child.managedPid,0);}catch(error){if(error.code==='ESRCH')return;throw error;}
+    if(Date.now()>=deadline)throw new Error('Сетевое ядро ещё не завершилось. Повторите остановку.');
+    await new Promise(resolve=>setTimeout(resolve,25));
+  }
 }
 async function stopChild(child, {tree=true}={}) {
   if (!child || child.exitCode !== null || child.signalCode != null) return;
@@ -50,4 +82,4 @@ async function inspectNetworkConflicts() {
   try { return JSON.parse(await runCommand('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script])); }
   catch { return { proxyEnabled: false, tunnelNames: [], unavailable: true }; }
 }
-module.exports = { runCommand, runWithInput, terminateChild, inspectNetworkConflicts };
+module.exports = { runCommand, runWithInput, terminateChild, inspectNetworkConflicts,spawnOwned,processHostPath };
