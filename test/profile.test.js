@@ -90,7 +90,7 @@ test('ALT12 mirrors the current upstream profile for selected YouTube and Discor
   assert.ok(args.includes('--dpi-desync=hostfakesplit'));
   assert.ok(args.includes('--dpi-desync-hostfakesplit-mod=host=www.google.com'));
   assert.ok(args.includes('--dpi-desync-split-seqovl=664'));
-  assert.ok(args.includes('--dpi-desync-fake-discord=C:\\Engine\\bin\\stun.bin'));
+  assert.ok(args.includes('--dpi-desync-fake-discord='+require('node:path').join('C:\\Engine','bin','stun.bin')));
   assert.ok(args.includes('--dpi-desync-repeats=3'));
 });
 
