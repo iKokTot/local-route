@@ -3,6 +3,8 @@ const { createProfile } = require('./profile');
 
 function buildEngineArgs({ engineRoot, hostListPath, googleHostListPath = hostListPath, generalHostListPath = hostListPath, telegramIpSetPath, profile }) {
   const selected = createProfile(profile);
+  const updated=require('./flowseal-engine').buildFlowsealArgs({engineRoot,hostListPath,googleHostListPath,generalHostListPath,profile:selected});
+  if(updated)return updated;
   const upstreamFamilies = {
     zapretAlt: 'fakeSplitTs', zapretAlt2: 'split652', zapretAlt3: 'hostFakeYa', zapretAlt4: 'badseq1000', zapretAlt5: 'simpleTs',
     zapretAlt6: 'split681', zapretAlt7: 'splitSni', zapretAlt8: 'badseqNone', zapretAlt9: 'hostFakeOzon', zapretAlt10: 'fake4pda',

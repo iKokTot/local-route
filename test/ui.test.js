@@ -48,11 +48,14 @@ async function open(initial = fixture(), viewport = { width: 1440, height: 1000 
       return copy(mock.state);
     };
     const reply = () => ({ ok: true, state: snapshot(), message: 'Действие выполнено.' });
-    window.localRoute = new Proxy({}, { get: (_, name) => name === 'onProgress' ? (callback) => { mock.progress=callback; return () => {}; } : async (raw) => {
+    window.localRoute = new Proxy({}, { get: (_, name) => name === 'onProgress' ? (callback) => { mock.progress=callback; return () => {}; } : name==='onUpdate' ? callback=>{mock.update=callback;return ()=>{};} : async (raw) => {
       mock.calls.push({ name, raw: copy(raw ?? null) });
       if (mock.delays?.[name]) await new Promise((resolve) => setTimeout(resolve, mock.delays[name]));
       if (mock.fault === name) throw new Error('Тестовая ошибка IPC');
       if (name === 'readState') { mock.readsCompleted = (mock.readsCompleted || 0) + 1; return snapshot(); }
+      if(name==='checkUpdates'){mock.state.appUpdate=mock.updateResult || {status:'current',checkedAt:Date.now(),latest:null};return {ok:true,update:copy(mock.state.appUpdate)};}
+      if(name==='setUpdateChecks'){mock.state.updateChecksEnabled=raw;return {ok:true,enabled:raw,update:mock.state.appUpdate || {status:'idle'}};}
+      if(name==='restorePreviousDpi'){mock.state.profile=copy(mock.state.previousDpi.profile);mock.state.verifiedStrategy=mock.state.previousDpi.strategy;mock.state.previousDpi=null;return reply();}
       if (name === 'explainRoute') return {ok:true,domain:'avito.ru',route:'direct',reason:'Совпало сохранённое исключение: avito.ru.',caveat:'Расчёт по правилам, не проверка IP.'};
       if (name === 'saveProfile') {
         mock.state.profile = { ...raw, domains: raw.services.flatMap((service) => [`${service}.com`]).concat(raw.customDomains) };
@@ -685,6 +688,45 @@ test('Route explanation is compact, readable and remains available during other 
   await page.locator('#explain-route').click();
   await page.waitForFunction(()=>document.querySelector('#route-explanation').textContent.includes('Не удалось'));
   assert.equal(await page.locator('#explain-route').isEnabled(),true);
+  assert.deepEqual(page.errors,[]);await page.close();
+});
+test('Update notice survives refresh, offers a release link and settings remain independent of network operations',async()=>{
+  const page=await open();
+  assert.equal(await page.locator('#app-update-notice').isVisible(),false);
+  await page.evaluate(()=>{
+    mock.state.appUpdate={status:'available',checkedAt:Date.now(),latest:{version:'0.99.0',prerelease:true,url:'https://github.com/iKokTot/local-route/releases/tag/v0.99.0'}};
+    mock.update(mock.state.appUpdate);
+  });
+  assert.equal(await page.locator('#app-update-notice').isVisible(),true);
+  assert.match(await page.locator('#app-update-title').textContent(),/0.99.0.*бета/);
+  await page.locator('#app-update-notice').screenshot({path:path.join(output,'app-update-notice.png'),animations:'disabled'});
+  await page.locator('#app-update-notice button').click();
+  assert.equal(await page.evaluate(()=>mock.calls.some(c=>c.name==='openUpdate')),true);
+  await page.locator('.topbar [data-page="settings"]').click();
+  await page.evaluate(()=>{mock.state.operation={kind:'telegram:start'};mock.progress(mock.state.operation);});
+  await page.locator('#app-update-settings').screenshot({path:path.join(output,'app-update-settings.png'),animations:'disabled'});
+  assert.equal(await page.locator('#check-updates').isEnabled(),true);
+  await page.locator('#update-checks-enabled').uncheck();
+  await page.waitForFunction(()=>mock.state.updateChecksEnabled===false);
+  await page.locator('#check-updates').click();await page.waitForFunction(()=>mock.calls.some(c=>c.name==='checkUpdates'));
+  assert.match(await page.locator('#update-status').textContent(),/Новых версий/);
+  assert.equal(await page.locator('#app-update-notice').isVisible(),false);
+  await page.evaluate(()=>{mock.fault='checkUpdates';});
+  await page.locator('#check-updates').click();await page.waitForFunction(()=>document.querySelector('#update-status').textContent.includes('Не удалось'));
+  assert.equal(await page.locator('#check-updates').isEnabled(),true);
+  assert.deepEqual(page.errors,[]);await page.close();
+});
+test('DPI rollback restores the previous catalog and strategy through the visible action',async()=>{
+  const initial=fixture();
+  const old={...initial.profile,catalogVersion:1};
+  initial.profile={...initial.profile,strategy:'fs1104Alt12',catalogVersion:2};
+  initial.verifiedStrategy='fs1104Alt12';initial.previousDpi={profile:old,strategy:'zapretAlt'};
+  const page=await open(initial);await nav(page,'lab');
+  assert.equal(await page.locator('#restore-previous-dpi').isVisible(),true);
+  await page.locator('#restore-previous-dpi').click();await idle(page);
+  assert.equal(await page.evaluate(()=>mock.state.profile.catalogVersion),1);
+  assert.equal(await page.evaluate(()=>mock.state.verifiedStrategy),'zapretAlt');
+  assert.equal(await page.locator('#restore-previous-dpi').isVisible(),false);
   assert.deepEqual(page.errors,[]);await page.close();
 });
 test('phone navigation stays at the bottom while only page content scrolls',async()=>{

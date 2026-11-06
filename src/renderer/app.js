@@ -39,7 +39,23 @@ let currentPage = 'control';
 let toastTimer;
 let progressTimer;
 let progressOperation = null;
+let seenUpdateVersion='';
 const scrollPositions = {};
+
+function renderUpdates() {
+  const update=state?.appUpdate || {status:'idle'};
+  const available=Boolean(update.latest);
+  $('#app-update-notice').classList.toggle('hidden',!available || isAndroid());
+  $('#app-update-title').textContent=available?`Доступна Local Route ${update.latest.version}${update.latest.prerelease?' · бета':''}`:'';
+  $('#app-update-settings').classList.toggle('hidden',isAndroid());
+  $('#update-checks-enabled').checked=state?.updateChecksEnabled!==false;
+  $('#check-updates').disabled=update.status==='checking';
+  $('#check-updates').textContent=update.status==='checking'?'Проверяю…':'Проверить обновления';
+  $('#update-status').textContent=update.status==='checking'?'Проверяю релизы на GitHub…':update.status==='error'?update.message:available?`Доступна версия ${update.latest.version}${update.latest.prerelease?' (бета)':''}.`:update.status==='current'?'Новых версий с Windows-установщиком не найдено.':'Обновления ещё не проверялись.';
+  $('#update-checked-at').textContent=update.checkedAt?'Последняя успешная проверка: '+new Date(update.checkedAt).toLocaleString('ru-RU'):'';
+  $('#settings-open-update').classList.toggle('hidden',!available);
+  if(update.status==='available' && available && seenUpdateVersion!==update.latest.version){seenUpdateVersion=update.latest.version;toast(`Доступна Local Route ${update.latest.version}. Откройте релиз в уведомлении или настройках.`);}
+}
 
 function toast(message) {
   clearTimeout(toastTimer);
@@ -65,7 +81,7 @@ function currentLaunchSettings() {
 }
 function resetDraft(kind) {
   if (kind === 'dpi') {
-    dpiDraft = { services: [...state.profile.services], customDomains: [...state.profile.customDomains], strategy: state.profile.strategy };
+    dpiDraft = { services: [...state.profile.services], customDomains: [...state.profile.customDomains], strategy: state.profile.strategy, catalogVersion:state.profile.catalogVersion??1 };
     savedDpi = JSON.stringify(dpiDraft);
   } else if (kind === 'vless') {
     vlessDraft = { uri: '', mode: 'exclude', excludedApps: [...(state.vless?.excludedApps || [])], excludedDomains: [...(state.vless?.excludedDomains || [])] };
@@ -133,6 +149,7 @@ function renderControls() {
   disable('#stop-vless',(!state.vlessActive && !vpnStarting) || pending?.kind==='stop','VPN уже выключен');
   disable('#start-dpi', busy || (!state.active && (!state.verifiedStrategy || dirty('dpi'))), 'Подберите стратегию на вкладке «YouTube и Discord»');
   disable('#start-saved-dpi', busy || state.active || !state.verifiedStrategy || dirty('dpi'), 'Сначала подберите и сохраните стратегию');
+  disable('#restore-previous-dpi',busy || state.active || dirty('dpi'),'Сначала остановите DPI и сохраните изменения');
   disable('[data-auto-select], .test-strategy', busy || dirty('dpi') || (!state.profile.services.length && !state.profile.customDomains.length), 'Сначала выберите YouTube или Discord и сохраните сервисы');
   disable('.stop-engine', (busy && !dpiBusy) || (!state.active && !dpiBusy), 'DPI уже остановлен');
   disable('#telegram-port', tgLocked || isAndroid(), 'Порт Android-прокси — 1443');
@@ -190,6 +207,9 @@ function renderControls() {
   }
 }
 function renderState() {
+  renderUpdates();
+  $('#restore-previous-dpi').classList.toggle('hidden',!state.previousDpi || isAndroid());
+  $('#restore-previous-dpi').disabled=Boolean(state.active || state.operation || pending || dirty('dpi'));
   if (!state) return;
   const running = [state.active && 'DPI', state.vlessActive && 'VPN', state.telegramActive && 'Telegram'].filter(Boolean);
   for (const [selector, active] of [['#dpi-run-state', state.active], ['#vless-run-state', state.vlessActive], ['#telegram-run-state', state.telegramActive]]) {
@@ -435,6 +455,18 @@ function addDomain(kind) {
 }
 async function handleAction(button) {
   const id = button.id;
+  if(id==='check-updates') {
+    button.disabled=true;
+    try {const result=await window.localRoute.checkUpdates();state.appUpdate=result.update || {status:'error',message:result.message || 'Не удалось проверить обновления.'};}
+    catch {state.appUpdate={...state.appUpdate,status:'error',message:'Не удалось проверить обновления. Повторите позже.'};}
+    finally {renderUpdates();}
+    return;
+  }
+  if(button.hasAttribute('data-open-update')) {
+    try {const reply=await window.localRoute.openUpdate();if(reply?.ok===false)toast(reply.message);}
+    catch {toast('Не удалось открыть страницу релиза.');}
+    return;
+  }
   if(id==='explain-route') {
     const output=$('#route-explanation');
     button.disabled=true;
@@ -493,6 +525,7 @@ async function handleAction(button) {
   if (id === 'start-all') return perform('all', 'Запускаю настроенные компоненты…', () => window.localRoute.startAll());
   if (id === 'stop-all') return stopDpi(true);
   if (id === 'start-dpi' || id === 'start-saved-dpi') return state.active ? stopDpi(false) : perform('start', 'Запускаю сохранённую стратегию DPI…', () => window.localRoute.startVerified());
+  if(id==='restore-previous-dpi')return perform('save','Восстанавливаю предыдущий профиль…',()=>window.localRoute.restorePreviousDpi(),()=>{resetDraft('dpi');renderEditor('dpi');});
   if (button.matches('.stop-engine')) return stopDpi(false);
   if (button.hasAttribute('data-auto-select') || button.dataset.strategy) {
     const strategy = button.dataset.strategy;
@@ -513,7 +546,7 @@ async function handleAction(button) {
     });
   }
   if (id === 'run-check' || id === 'refresh-log') { await refreshState(); return; }
-  const links = { 'open-release-channel': 'https://t.me/TheLocalRoute', 'open-max-channel': 'https://max.ru/channel_LocalRoute', 'open-repository': 'https://github.com/iKokTot/local-route' };
+  const links = { 'open-release-channel': 'https://t.me/localroutedpi', 'open-max-channel': 'https://max.ru/channel_LocalRoute', 'open-repository': 'https://github.com/iKokTot/local-route' };
   if (links[id]) await window.localRoute.open(links[id]);
 }
 document.addEventListener('click', (event) => {
@@ -548,6 +581,14 @@ document.addEventListener('change', (event) => {
     $('#vless-app-count').textContent = `${vlessDraft.excludedApps.length} выбрано`;
   }
   if (input.id === 'vless-mode') { vlessDraft.mode = input.value; renderMode(); }
+  if(input.id==='update-checks-enabled') {
+    const enabled=input.checked;input.disabled=true;
+    window.localRoute.setUpdateChecks(enabled).then(reply=>{
+      if(reply.ok===false)throw new Error(reply.message);
+      state.updateChecksEnabled=reply.enabled;state.appUpdate=reply.update;
+    }).catch(()=>toast('Не удалось сохранить проверку обновлений.')).finally(()=>{input.disabled=false;renderUpdates();});
+    return;
+  }
   if (input.id === 'autostart-toggle') perform('save', 'Сохраняю автозапуск…', () => window.localRoute.setAutoStart(input.checked));
   renderControls();
 });
@@ -588,6 +629,7 @@ window.localRoute.onProgress?.((operation) => {
   renderControls();
   if (!operation && !pending) refreshState();
 });
+window.localRoute.onUpdate?.((update)=>{if(state){state.appUpdate=update;renderUpdates();}});
 window.addEventListener('focus', () => { if (state) refreshState(); });
 // Local process status only. Editors are never rebuilt by a background refresh.
 setInterval(() => { if (state && !document.hidden) refreshState(); }, 15000);

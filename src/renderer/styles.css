@@ -308,3 +308,5 @@ footer { margin-top: 32px; color: var(--on-surface-variant); font-size: 11px; }
 .launch-options { min-width: 0; align-content: start; }
 @media (max-width: 700px) { #launch-component-settings { grid-template-columns: 1fr; gap: 20px; } .launch-options legend { min-height: 0; } }
 #route-explanation { white-space: pre-line; overflow-wrap: anywhere; }
+#app-update-notice { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
+#app-update-title { overflow-wrap:anywhere; }

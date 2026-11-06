@@ -9,6 +9,8 @@ The included `WinDivert.dll` and `WinDivert64.sys` components are distributed un
 
 The complete upstream MIT notice is included in `engine/LICENSE.txt` in the packaged build.
 
+Versioned DPI profiles in `src/config/flowseal-1.10.4.json` are adapted from Flowseal 1.10.4 (strategy snapshot also matches commit `2401b7a13837139b0265632464ba563dddbf80d8`). They retain selected-service scope; broad IPSet/GameFilter and the original ALT5 are not imported. Reference BAT files and the upstream MIT notice are in `test/fixtures/flowseal-1.10.4/` and are never executed by Local Route.
+
 # sing-box
 
 Local Route bundles `sing-box` 1.14.2 for selective VLESS routing on Windows.

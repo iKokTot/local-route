@@ -55,7 +55,8 @@ const UPSTREAM_STRATEGIES = Object.freeze([
 ]);
 const STRATEGIES = Object.freeze([
   { id: 'auto', label: 'Автоподбор — все профили' },
-  ...UPSTREAM_STRATEGIES,
+  ...require('../config/flowseal-1.10.4.json').strategies.map(({id,label})=>({id,label})),
+  ...UPSTREAM_STRATEGIES.map(strategy=>({...strategy,label:strategy.label+' · прежняя версия'})),
   { id: 'alt12', label: 'Упрощённый ALT12' },
   { id: 'balanced', label: 'Сбалансированная' },
   { id: 'compatibility', label: 'Совместимость' },
@@ -64,7 +65,16 @@ const STRATEGIES = Object.freeze([
   { id: 'fakeTls', label: 'Fake TLS' }
 ]);
 const STRATEGY_IDS = new Set(STRATEGIES.map((strategy) => strategy.id));
-const AUTO_STRATEGIES = Object.freeze(UPSTREAM_STRATEGIES.map((strategy) => strategy.id));
+// Original ALT5 captures broad TCP traffic; keep our prior scoped adaptation
+// as the last fallback instead of silently widening network interception.
+const AUTO_STRATEGIES = Object.freeze([
+  ...UPSTREAM_STRATEGIES.filter(s=>s.id!=='zapretAlt5').map(strategy=>STRATEGIES.find(s=>s.id.startsWith('fs1104') && s.label.split(' · ')[0]===strategy.label)?.id).filter(Boolean),
+  'zapretAlt5'
+]);
+const EXTRA_DOMAINS = Object.freeze({
+  youtube:['yt3.googleusercontent.com','jnn-pa.googleapis.com','wide-youtube.l.google.com','youtube-ui.l.google.com','yt-video-upload.l.google.com','ytimg.l.google.com'],
+  discord:['discord-attachments-uploads-prd.storage.googleapis.com','discord.app','discordpartygames.com']
+});
 
 function orderedAutoStrategies(preferredStrategy) {
   if (!preferredStrategy || !STRATEGY_IDS.has(preferredStrategy) || preferredStrategy === 'auto') return [...AUTO_STRATEGIES];
@@ -80,16 +90,19 @@ function isDomain(value) {
   return domain.length < 254 && /^(?!-)(?:[a-z0-9-]{1,63}\.)+[a-z]{2,63}$/.test(domain);
 }
 
-function createProfile({ services = [], customDomains = [], strategy = 'auto' } = {}) {
+function createProfile({ services = [], customDomains = [], strategy = 'auto', catalogVersion = 2 } = {}) {
+  const version=catalogVersion===1?1:2;
   const selected = [...new Set(services)].filter((service) => SERVICE_CATALOG[service] && ENABLED_SERVICE_IDS.has(service));
   const domains = [
     ...selected.flatMap((service) => SERVICE_CATALOG[service].domains),
+    ...(version===2?selected.flatMap(service=>EXTRA_DOMAINS[service] || []):[]),
     ...customDomains.map(normalizeDomain).filter(isDomain)
   ];
   return {
     services: selected,
     customDomains: [...new Set(customDomains.map(normalizeDomain).filter(isDomain))],
     strategy: STRATEGY_IDS.has(strategy) ? strategy : 'auto',
+    catalogVersion:version,
     domains: [...new Set(domains)].sort()
   };
 }

@@ -1,7 +1,7 @@
 {
   "appId": "com.localroute.app",
   "productName": "Local Route",
-  "directories": { "output": "outputs/installer-0.29.0" },
+  "directories": { "output": "outputs/installer-0.30.0" },
   "win": {
     "target": [{"target":"nsis","arch":["x64"]}],
     "icon": "src/renderer/assets/local-route.ico",

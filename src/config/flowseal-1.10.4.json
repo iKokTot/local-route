@@ -1,0 +1,1120 @@
+{
+  "upstream": "https://github.com/Flowseal/zapret-discord-youtube",
+  "release": "1.10.4",
+  "commit": "2401b7a13837139b0265632464ba563dddbf80d8",
+  "archiveSha256": "291af673bd0238506f9548e0e94ca0abf244000f4c9a06960544fb01c5f97b34",
+  "scope": "Selected domains only; no upstream IPSet/GameFilter or service scripts. QUIC limited to UDP 443 with combined selected hostlist.",
+  "omitted": {
+    "ALT5": "Original syndata profile captures broad IPv4 TCP; retained legacy adaptation under zapretAlt5 instead."
+  },
+  "strategies": [
+    {
+      "id": "fs1104Alt",
+      "label": "Zapret ALT · 1.10.4",
+      "file": "general (ALT).bat",
+      "sourceSha256": "c06b793015ea041b4e030dca1217548c57fcddaaf883aef8f1de3aa0a642da6e",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=6"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=fake,fakedsplit",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-fakedsplit-pattern=0x00",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--ip-id=zero",
+          "--dpi-desync=fake,fakedsplit",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-fakedsplit-pattern=0x00",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=fake,fakedsplit",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-fakedsplit-pattern=0x00",
+          "--dpi-desync-fake-tls=@BIN@/stun.bin",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_google_com.bin",
+          "--dpi-desync-fake-http=@BIN@/tls_clienthello_www_sferum_ru.bin"
+        ]
+      }
+    },
+    {
+      "id": "fs1104Alt10",
+      "label": "Zapret ALT10 · 1.10.4",
+      "file": "general (ALT10).bat",
+      "sourceSha256": "b76bbfe83248bea834c534423652b47c822411741f9d804e3ee313628aa62dee",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=6"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_google_com.bin",
+          "--dpi-desync-fake-tls-mod=none"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--ip-id=zero",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-fake-tls=@BIN@/stun.bin",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_4pda_to.bin",
+          "--dpi-desync-fake-http=@BIN@/tls_clienthello_www_sferum_ru.bin"
+        ]
+      }
+    },
+    {
+      "id": "fs1104Alt11",
+      "label": "Zapret ALT11 · 1.10.4",
+      "file": "general (ALT11).bat",
+      "sourceSha256": "be0c7edb84246cb14a2ecb0d2c9375bdd651abccec4ae529a8eb098da98125f5",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=11",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=6"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=fake,multisplit",
+          "--dpi-desync-split-seqovl=681",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-repeats=8",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--ip-id=zero",
+          "--dpi-desync=fake,multisplit",
+          "--dpi-desync-split-seqovl=681",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-repeats=8",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=fake,multisplit",
+          "--dpi-desync-split-seqovl=664",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-repeats=8",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_sferum_ru.bin",
+          "--dpi-desync-fake-tls=@BIN@/stun2.bin",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_sferum_ru.bin",
+          "--dpi-desync-fake-http=@BIN@/tls_clienthello_www_sferum_ru.bin"
+        ]
+      }
+    },
+    {
+      "id": "fs1104Alt12",
+      "label": "Zapret ALT12 · 1.10.4",
+      "file": "general (ALT12).bat",
+      "sourceSha256": "e9e6b3294f255d32b7763811555a1a57538bb6db11ba21c6ee5785ace2f16e9b",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=11",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-discord=@BIN@/stun.bin",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=3"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=fake,multisplit",
+          "--dpi-desync-split-seqovl=681",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-repeats=8",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--ip-id=zero",
+          "--dpi-desync=hostfakesplit",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-hostfakesplit-mod=host=www.google.com"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=fake,multisplit",
+          "--dpi-desync-split-seqovl=664",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-repeats=8",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_sferum_ru.bin",
+          "--dpi-desync-fake-tls=@BIN@/stun.bin",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_sferum_ru.bin",
+          "--dpi-desync-fake-http=@BIN@/tls_clienthello_www_sferum_ru.bin"
+        ]
+      }
+    },
+    {
+      "id": "fs1104Alt13",
+      "label": "Zapret ALT13 · 1.10.4",
+      "file": "general (ALT13).bat",
+      "sourceSha256": "d3214862eda18923e18204078f5e7484d98e1c93d6b6ff6c95eb483be5975f17",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=11",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=5"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=fake,multisplit",
+          "--dpi-desync-split-seqovl=681",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-repeats=7",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--dpi-desync=hostfakesplit",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-hostfakesplit-mod=host=www.google.com"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=fake,hostfakesplit",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-hostfakesplit-mod=host=mail.ru,altorder=1",
+          "--dpi-desync-repeats=5",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_sochi_park.bin",
+          "--dpi-desync-fake-tls=@BIN@/stun2.bin",
+          "--dpi-desync-fake-http=@BIN@/tls_clienthello_sochi_park.bin"
+        ]
+      }
+    },
+    {
+      "id": "fs1104Alt2",
+      "label": "Zapret ALT2 · 1.10.4",
+      "file": "general (ALT2).bat",
+      "sourceSha256": "8d1843b688638f927eaff9217723781a8dcc4e2180459e59d06308e2a8052ac1",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=6"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=multisplit",
+          "--dpi-desync-split-seqovl=652",
+          "--dpi-desync-split-pos=2",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--ip-id=zero",
+          "--dpi-desync=multisplit",
+          "--dpi-desync-split-seqovl=652",
+          "--dpi-desync-split-pos=2",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=multisplit",
+          "--dpi-desync-split-seqovl=652",
+          "--dpi-desync-split-pos=2",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin"
+        ]
+      }
+    },
+    {
+      "id": "fs1104Alt3",
+      "label": "Zapret ALT3 · 1.10.4",
+      "file": "general (ALT3).bat",
+      "sourceSha256": "05d2f4471572144be8fce8a0053761d52c277f9d71eb09f278cb4eaf9b067773",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=6"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=fake,hostfakesplit",
+          "--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com",
+          "--dpi-desync-hostfakesplit-mod=host=www.google.com,altorder=1",
+          "--dpi-desync-fooling=ts"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--ip-id=zero",
+          "--dpi-desync=fake,hostfakesplit",
+          "--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com",
+          "--dpi-desync-hostfakesplit-mod=host=www.google.com,altorder=1",
+          "--dpi-desync-fooling=ts"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=fake,hostfakesplit",
+          "--dpi-desync-fake-tls-mod=rnd,dupsid,sni=ya.ru",
+          "--dpi-desync-hostfakesplit-mod=host=ya.ru,altorder=1",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-fake-http=@BIN@/tls_clienthello_www_sferum_ru.bin"
+        ]
+      }
+    },
+    {
+      "id": "fs1104Alt4",
+      "label": "Zapret ALT4 · 1.10.4",
+      "file": "general (ALT4).bat",
+      "sourceSha256": "6331f8bc161d92f7f4b6bd5508b69a2b6d8a70774d491229598d6377102990c6",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=6"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=fake,multisplit",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fooling=badseq",
+          "--dpi-desync-badseq-increment=1000",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--ip-id=zero",
+          "--dpi-desync=fake,multisplit",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fooling=badseq",
+          "--dpi-desync-badseq-increment=1000",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=fake,multisplit",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fooling=badseq",
+          "--dpi-desync-badseq-increment=1000",
+          "--dpi-desync-fake-tls=@BIN@/stun.bin",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_google_com.bin",
+          "--dpi-desync-fake-http=@BIN@/tls_clienthello_www_sferum_ru.bin"
+        ]
+      }
+    },
+    {
+      "id": "fs1104Alt6",
+      "label": "Zapret ALT6 · 1.10.4",
+      "file": "general (ALT6).bat",
+      "sourceSha256": "cb2323d4d8b112f4ac0ab2dc4260193aceaa25e85820e78357134144c8a17b85",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=6"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=multisplit",
+          "--dpi-desync-split-seqovl=681",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--ip-id=zero",
+          "--dpi-desync=multisplit",
+          "--dpi-desync-split-seqovl=681",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=multisplit",
+          "--dpi-desync-split-seqovl=681",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin"
+        ]
+      }
+    },
+    {
+      "id": "fs1104Alt7",
+      "label": "Zapret ALT7 · 1.10.4",
+      "file": "general (ALT7).bat",
+      "sourceSha256": "eba9682040666fea85ae6fad74557c664539f8e5658269bbf76ba337ebb39b66",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=6"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=multisplit",
+          "--dpi-desync-split-pos=2,sniext+1",
+          "--dpi-desync-split-seqovl=679",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--ip-id=zero",
+          "--dpi-desync=multisplit",
+          "--dpi-desync-split-pos=2,sniext+1",
+          "--dpi-desync-split-seqovl=679",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=multisplit",
+          "--dpi-desync-split-pos=2,sniext+1",
+          "--dpi-desync-split-seqovl=679",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin"
+        ]
+      }
+    },
+    {
+      "id": "fs1104Alt8",
+      "label": "Zapret ALT8 · 1.10.4",
+      "file": "general (ALT8).bat",
+      "sourceSha256": "0236d5ad5bd07d22f44798dce6a7c0a0ea700857b303bcdaf34861bd64ff0c23",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=6"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-tls-mod=none",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fooling=badseq",
+          "--dpi-desync-badseq-increment=2"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--ip-id=zero",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-tls-mod=none",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fooling=badseq",
+          "--dpi-desync-badseq-increment=2"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-tls-mod=none",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fooling=badseq",
+          "--dpi-desync-badseq-increment=2",
+          "--dpi-desync-fake-http=@BIN@/tls_clienthello_www_sferum_ru.bin"
+        ]
+      }
+    },
+    {
+      "id": "fs1104Alt9",
+      "label": "Zapret ALT9 · 1.10.4",
+      "file": "general (ALT9).bat",
+      "sourceSha256": "55d9e9ad708e18a874166470dd94a1a83621e8cfd4f3fbb1f61d8227d9de4402",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=6"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=hostfakesplit",
+          "--dpi-desync-repeats=4",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-hostfakesplit-mod=host=www.google.com"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--ip-id=zero",
+          "--dpi-desync=hostfakesplit",
+          "--dpi-desync-repeats=4",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-hostfakesplit-mod=host=www.google.com"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=hostfakesplit",
+          "--dpi-desync-repeats=4",
+          "--dpi-desync-fooling=ts,md5sig",
+          "--dpi-desync-hostfakesplit-mod=host=ozon.ru"
+        ]
+      }
+    },
+    {
+      "id": "fs1104Exp",
+      "label": "Zapret EXP · 1.10.4",
+      "file": "general (EXP).bat",
+      "sourceSha256": "f799a393c8d781f1856d45b4627bd5a39bde1e56a4753bf99bd2e432fc235da2",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--filter-l7=quic",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=11",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun,unknown",
+          "--dpi-desync=fake",
+          "--dpi-desync-any-protocol=1",
+          "--dpi-desync-fake-discord=@BIN@/quic_initial_www_google_com.bin",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-unknown-udp=@BIN@/quic_initial_www_google_com.bin",
+          "--dpi-desync-fake-unknown-udp=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=4",
+          "--dpi-desync-cutoff=n4"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=fake,multisplit",
+          "--dpi-desync-split-seqovl=681",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-repeats=8",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--ip-id=zero",
+          "--dpi-desync=hostfakesplit",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-hostfakesplit-mod=host=www.google.com"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=fake,multisplit",
+          "--dpi-desync-split-seqovl=480",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-repeats=4",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/stun2.bin",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_sferum_ru.bin",
+          "--dpi-desync-fake-http=@BIN@/tls_clienthello_www_sferum_ru.bin"
+        ]
+      }
+    },
+    {
+      "id": "fs1104FakeTlsAutoAlt",
+      "label": "Zapret FAKE TLS AUTO ALT · 1.10.4",
+      "file": "general (FAKE TLS AUTO ALT).bat",
+      "sourceSha256": "3937fdd52eef1a83ad6557a464e59f0c320a9b7c9be0c16bfbe9afa6a35af12b",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=11",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=6"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=fake,fakedsplit",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-fooling=badseq",
+          "--dpi-desync-badseq-increment=2",
+          "--dpi-desync-repeats=8",
+          "--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--ip-id=zero",
+          "--dpi-desync=fake,fakedsplit",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-fooling=badseq",
+          "--dpi-desync-badseq-increment=2",
+          "--dpi-desync-repeats=8",
+          "--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=fake,fakedsplit",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-fooling=badseq",
+          "--dpi-desync-badseq-increment=2",
+          "--dpi-desync-repeats=8",
+          "--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com",
+          "--dpi-desync-fake-http=@BIN@/tls_clienthello_www_sferum_ru.bin"
+        ]
+      }
+    },
+    {
+      "id": "fs1104FakeTlsAutoAlt2",
+      "label": "Zapret FAKE TLS AUTO ALT2 · 1.10.4",
+      "file": "general (FAKE TLS AUTO ALT2).bat",
+      "sourceSha256": "5f07c55cc333cbb05233340c2d72462219f7dffe1182926ae809c5e9d8ebdc6e",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=11",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=6"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=fake,multisplit",
+          "--dpi-desync-split-seqovl=681",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-fooling=badseq",
+          "--dpi-desync-badseq-increment=10000000",
+          "--dpi-desync-repeats=8",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin",
+          "--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--ip-id=zero",
+          "--dpi-desync=fake,multisplit",
+          "--dpi-desync-split-seqovl=681",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-fooling=badseq",
+          "--dpi-desync-badseq-increment=10000000",
+          "--dpi-desync-repeats=8",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin",
+          "--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=fake,multisplit",
+          "--dpi-desync-split-seqovl=681",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-fooling=badseq",
+          "--dpi-desync-badseq-increment=10000000",
+          "--dpi-desync-repeats=8",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin",
+          "--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com",
+          "--dpi-desync-fake-http=@BIN@/tls_clienthello_www_sferum_ru.bin"
+        ]
+      }
+    },
+    {
+      "id": "fs1104FakeTlsAutoAlt3",
+      "label": "Zapret FAKE TLS AUTO ALT3 · 1.10.4",
+      "file": "general (FAKE TLS AUTO ALT3).bat",
+      "sourceSha256": "eebb1667126a4448e9bb7e62c7fab133f59a62099fae43160de257fb04e73a8f",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=11",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=6"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=fake,multisplit",
+          "--dpi-desync-split-seqovl=681",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-repeats=8",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin",
+          "--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--ip-id=zero",
+          "--dpi-desync=fake,multisplit",
+          "--dpi-desync-split-seqovl=681",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-repeats=8",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin",
+          "--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=fake,multisplit",
+          "--dpi-desync-split-seqovl=681",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-repeats=8",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin",
+          "--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com",
+          "--dpi-desync-fake-http=@BIN@/tls_clienthello_www_sferum_ru.bin"
+        ]
+      }
+    },
+    {
+      "id": "fs1104FakeTlsAuto",
+      "label": "Zapret FAKE TLS AUTO · 1.10.4",
+      "file": "general (FAKE TLS AUTO).bat",
+      "sourceSha256": "bcfdc17e84494169b75ebb906e91465e5d140153d6b924116b2f9fc6740e71a4",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=11",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=6"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=fake,multidisorder",
+          "--dpi-desync-split-pos=1,midsld",
+          "--dpi-desync-repeats=11",
+          "--dpi-desync-fooling=badseq",
+          "--dpi-desync-fake-tls=0x00000000",
+          "--dpi-desync-fake-tls=!",
+          "--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--ip-id=zero",
+          "--dpi-desync=fake,multidisorder",
+          "--dpi-desync-split-pos=1,midsld",
+          "--dpi-desync-repeats=11",
+          "--dpi-desync-fooling=badseq",
+          "--dpi-desync-fake-tls=0x00000000",
+          "--dpi-desync-fake-tls=!",
+          "--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=fake,multidisorder",
+          "--dpi-desync-split-pos=1,midsld",
+          "--dpi-desync-repeats=11",
+          "--dpi-desync-fooling=badseq",
+          "--dpi-desync-fake-tls=0x00000000",
+          "--dpi-desync-fake-tls=!",
+          "--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com",
+          "--dpi-desync-fake-http=@BIN@/tls_clienthello_www_sferum_ru.bin"
+        ]
+      }
+    },
+    {
+      "id": "fs1104SimpleFakeAlt",
+      "label": "Zapret SIMPLE FAKE ALT · 1.10.4",
+      "file": "general (SIMPLE FAKE ALT).bat",
+      "sourceSha256": "05aba7ec4107fdcbb088e84fca76df094e589172343976b8219e0b055869cd46",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=6"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fooling=badseq",
+          "--dpi-desync-badseq-increment=2",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--ip-id=zero",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fooling=badseq",
+          "--dpi-desync-badseq-increment=2",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fooling=badseq",
+          "--dpi-desync-badseq-increment=2",
+          "--dpi-desync-fake-tls=@BIN@/stun2.bin",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_google_com.bin",
+          "--dpi-desync-fake-http=@BIN@/tls_clienthello_www_sferum_ru.bin"
+        ]
+      }
+    },
+    {
+      "id": "fs1104SimpleFakeAlt2",
+      "label": "Zapret SIMPLE FAKE ALT2 · 1.10.4",
+      "file": "general (SIMPLE FAKE ALT2).bat",
+      "sourceSha256": "b7e5949cabc132c32a096f59ac541eadb157d3940b72e53227b357cd82a0b8ea",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=6"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--ip-id=zero",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-fake-tls=@BIN@/stun2.bin",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_sferum_ru.bin",
+          "--dpi-desync-fake-http=@BIN@/tls_clienthello_www_sferum_ru.bin"
+        ]
+      }
+    },
+    {
+      "id": "fs1104SimpleFake",
+      "label": "Zapret SIMPLE FAKE · 1.10.4",
+      "file": "general (SIMPLE FAKE).bat",
+      "sourceSha256": "14248a37dc47ae5a9df7c44fdba22c48e26c53ef69d8a231ee7b50aabd3fc784",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=6"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--ip-id=zero",
+          "--dpi-desync=hostfakesplit",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-hostfakesplit-mod=host=www.google.com"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fooling=ts",
+          "--dpi-desync-fake-tls=@BIN@/tls_clienthello_www_google_com.bin",
+          "--dpi-desync-fake-http=@BIN@/tls_clienthello_www_sferum_ru.bin"
+        ]
+      }
+    },
+    {
+      "id": "fs1104Standard",
+      "label": "Zapret Standard · 1.10.4",
+      "file": "general.bat",
+      "sourceSha256": "22dff943d6ab2493d6463f6e8d9390b8ccbeceb7e5e87742ecc97704bc2bc185",
+      "groups": {
+        "quic": [
+          "--filter-udp=443",
+          "--hostlist=@ALL@",
+          "--dpi-desync=fake",
+          "--dpi-desync-repeats=6",
+          "--dpi-desync-fake-quic=@BIN@/quic_initial_www_google_com.bin"
+        ],
+        "discord": [
+          "--filter-udp=19294-19344,50000-50100",
+          "--filter-l7=discord,stun",
+          "--dpi-desync=fake",
+          "--dpi-desync-fake-discord=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-fake-stun=@BIN@/ACTIVE_DISCORD_UDP.bin",
+          "--dpi-desync-repeats=6"
+        ],
+        "media": [
+          "--filter-tcp=2053,2083,2087,2096,8443",
+          "--hostlist-domains=discord.media",
+          "--dpi-desync=multisplit",
+          "--dpi-desync-split-seqovl=681",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "google": [
+          "--filter-tcp=443",
+          "--hostlist=@GOOGLE@",
+          "--ip-id=zero",
+          "--dpi-desync=multisplit",
+          "--dpi-desync-split-seqovl=681",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_www_google_com.bin"
+        ],
+        "general": [
+          "--filter-tcp=80,443",
+          "--hostlist=@GENERAL@",
+          "--dpi-desync=multisplit",
+          "--dpi-desync-split-seqovl=568",
+          "--dpi-desync-split-pos=1",
+          "--dpi-desync-split-seqovl-pattern=@BIN@/tls_clienthello_4pda_to.bin"
+        ]
+      }
+    }
+  ]
+}

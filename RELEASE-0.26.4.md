@@ -27,6 +27,6 @@ VPN-серверы и подписки не предоставляются: до
 
 Проблемы: https://github.com/iKokTot/local-route/issues — укажите Windows, версию и шаги воспроизведения, без ключей, ссылок подписки и необработанных журналов.
 
-Telegram: https://t.me/TheLocalRoute
+Telegram: https://t.me/localroutedpi
 
 MAX: https://max.ru/channel_LocalRoute

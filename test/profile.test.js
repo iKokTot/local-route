@@ -54,8 +54,8 @@ test('autoselect contains the complete 22-profile Zapret catalogue with distinct
 test('the previous verified strategy is tested first without duplicating catalogue entries', () => {
   const ordered = orderedAutoStrategies('zapretAlt12');
   assert.equal(ordered[0], 'zapretAlt12');
-  assert.equal(ordered.length, AUTO_STRATEGIES.length);
-  assert.equal(new Set(ordered).size, AUTO_STRATEGIES.length);
+  assert.equal(ordered.length, AUTO_STRATEGIES.length+1);
+  assert.equal(new Set(ordered).size, AUTO_STRATEGIES.length+1);
 });
 
 test('engine command starts with a real filter and preserves shell-independent fake TLS marker', () => {
@@ -79,7 +79,7 @@ test('YouTube and Discord receive separate upstream-style TCP rules', () => {
   assert.ok(args.includes('--filter-tcp=2053,2083,2087,2096,8443'));
 });
 
-test('ALT12 mirrors the current upstream profile for selected YouTube and Discord traffic', () => {
+test('Legacy ALT12 preserves the old scoped command for rollback compatibility', () => {
   const args = buildEngineArgs({
     engineRoot: 'C:\\Engine',
     hostListPath: 'C:\\all.txt',

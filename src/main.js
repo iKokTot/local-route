@@ -1,6 +1,6 @@
 const {normalizeLibrary,addSubscription,removeSubscription,reconcileSelectedServer} = require('./core/server-library');
 const { parseSubscription, downloadSubscription, serverId } = require('./core/subscriptions');
-const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, safeStorage, clipboard, dialog, powerMonitor } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, safeStorage, clipboard, dialog, powerMonitor, Notification } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { spawn } = require('node:child_process');
@@ -29,6 +29,21 @@ const {probeThroughProxy}=require('./core/vless-check');
 const {createLibraryView}=require('./core/library-view');
 const publicLibraryView=createLibraryView({readLibrary:state=>readVlessLibrary(state)});
 const APP_VERSION = require('../package.json').version;
+const appUpdates = require('./core/app-updates').createUpdateChecker({currentVersion:APP_VERSION,onChange:publishUpdates});
+let updateNotification=null;
+function publishUpdates(update) {
+  if(isQuitting)return;
+  if(mainWindowReady && mainWindow && !mainWindow.isDestroyed())mainWindow.webContents.send('updates:changed',update);
+  if(update.status!=='available' || !update.latest)return;
+  try {
+    const saved=readState();
+    if(saved.updateChecksEnabled===false || saved.updateNotifiedVersion===update.latest.version || !Notification?.isSupported())return;
+    const notification=new Notification({title:'Доступна новая версия Local Route',body:`Версия ${update.latest.version}${update.latest.prerelease?' · бета':''}. Нажмите, чтобы открыть страницу релиза.`,silent:true});
+    notification.on('click',()=>shell.openExternal(update.latest.url).catch(()=>showMainWindow()));
+    updateNotification=notification;notification.show();
+    writeState({...readState(),updateNotifiedVersion:update.latest.version});
+  } catch { /* The persistent in-app notice remains available if Windows notifications fail. */ }
+}
 let telegramProcess = null;
 let telegramBusy = false;
 let telegramError = '';
@@ -79,7 +94,7 @@ async function startTelegram(operation = activeOperation) {
 }
 
 const stateFile = () => path.join(app.getPath('userData'), 'local-route.json');
-const defaults = { profile: createProfile({ services: ['youtube', 'discord'] }), enginePath: '', active: false, autoStart: false, verifiedStrategy: null, vless: createVlessProfile({mode:'exclude'}), vlessConfigured: false, vlessActive: false };
+const defaults = { profile: createProfile({ services: ['youtube', 'discord'] }), enginePath: '', active: false, autoStart: false, updateChecksEnabled:true, verifiedStrategy: null, vless: createVlessProfile({mode:'exclude'}), vlessConfigured: false, vlessActive: false };
 const launchedFromAutoStart = process.argv.includes('--autostart');
 let engineProcess = null;
 let vlessProcess = null;
@@ -473,7 +488,7 @@ async function startEngine(operation = activeOperation) {
 
 function store() {
   if (!stateStore) stateStore = createStateStore({ file: stateFile(), defaults, normalize: (saved) => ({
-    ...defaults, ...saved, profile: createProfile(saved.profile), vless: createVlessProfile(saved.vless || {mode:'exclude'}), telegram: proxySettings(saved.telegram), launchSettings: launchSettings(saved.launchSettings, saved.telegram?.enabled ?? true)
+    ...defaults, ...saved, profile: createProfile({...saved.profile,catalogVersion:saved.profile?.catalogVersion??1}), vless: createVlessProfile(saved.vless || {mode:'exclude'}), telegram: proxySettings(saved.telegram), launchSettings: launchSettings(saved.launchSettings, saved.telegram?.enabled ?? true)
   }) });
   return stateStore;
 }
@@ -490,11 +505,16 @@ function publicState(next) {
   safe.vlessSubscriptionSaved = view.hasSource;
   safe.vlessSubscriptions = view.subscriptions;
   safe.platform = 'windows';
-  return { ...safe, vpnHealth:vpnHealth.snapshot(), vpnCheck:lastVlessCheck?.serverId===serverId(current) ? lastVlessCheck : null, appVersion: APP_VERSION, catalog: publicCatalog(), operation: activeOperation ? { kind: activeOperation.kind, progress: activeOperation.progress, cancelled: activeOperation.cancelled } : null,
+  return { ...safe, appUpdate:appUpdates.snapshot(), vpnHealth:vpnHealth.snapshot(), vpnCheck:lastVlessCheck?.serverId===serverId(current) ? lastVlessCheck : null, appVersion: APP_VERSION, catalog: publicCatalog(), operation: activeOperation ? { kind: activeOperation.kind, progress: activeOperation.progress, cancelled: activeOperation.cancelled } : null,
     storageWarning: stateStore?.warning || libraryWarning, autoStartWarning,vlessError, telegram: proxySettings(next.telegram), telegramActive: telegramRunning(), telegramBusy, telegramError, active: engineIsRunning(), vlessActive: vlessIsRunning() };
 }
 function profilesTargetSame(left, right) {
   return left.services.join('\n') === right.services.join('\n') && left.domains.join('\n') === right.domains.join('\n');
+}
+function previousDpiProfile(state,strategy) {
+  return state.verifiedStrategy && state.verifiedStrategy!==strategy
+    ? {profile:state.profile,strategy:state.verifiedStrategy}
+    : state.previousDpi || null;
 }
 async function scheduledTaskExists() {
   if (process.platform !== 'win32') return false;
@@ -638,6 +658,9 @@ app.whenReady().then(async () => {
   if (!gotSingleInstanceLock) return;
   if (process.platform === 'win32') app.setAppUserModelId('com.localroute.app');
   createTray();
+  const checkUpdates=()=>{try{if(!isQuitting && readState().updateChecksEnabled!==false)appUpdates.check().catch(()=>{});}catch{}};
+  const updateDelay=setTimeout(checkUpdates,30000);updateDelay.unref?.();
+  const updateInterval=setInterval(checkUpdates,60*60*1000);updateInterval.unref?.();
   powerMonitor?.on('resume',()=>{
     vpnHealth.invalidate('resume');
     lastVlessCheck=null;
@@ -686,6 +709,7 @@ app.on('before-quit', (event) => {
   event.preventDefault();
   if (isQuitting) return;
   isQuitting = true;
+  appUpdates.cancel();
   cancelAndStop().then(flushLogs).then(() => { quitReady = true; app.quit(); }).catch(() => {
     isQuitting = false;
     pushLog('Завершение отложено: процесс не подтвердил остановку. Повторите «Остановить всё».');
@@ -701,6 +725,7 @@ function trustedEvent(event) {
   catch { return false; }
 }
 managedChannels.add('launch:save');
+managedChannels.add('engine:restorePrevious');
 // Stop must not queue behind the VPN operation it needs to cancel.
 function registerIpc(channel, callback) {
   ipcMain.handle(channel, async (event, ...args) => {
@@ -756,6 +781,14 @@ registerIpc('engine:startVerified', async () => {
   if (!result.ok) return result;
   const running = { ...result.state, active: engineIsRunning() };
   return { ok: true, state: { ...publicState(running), diagnostics: diagnostics(running), logs: readLogs() }, message: `Запущена подтверждённая стратегия: ${state.verifiedStrategy}.` };
+});
+registerIpc('engine:restorePrevious',()=>{
+  const state=readState(),previous=state.previousDpi;
+  if(engineIsRunning())return {ok:false,message:'Сначала остановите DPI.'};
+  if(!previous || !STRATEGY_IDS.has(previous.strategy) || previous.strategy==='auto')return {ok:false,message:'Предыдущая рабочая стратегия не сохранена.'};
+  const next={...state,profile:createProfile({...previous.profile,strategy:previous.strategy}),verifiedStrategy:previous.strategy,previousDpi:state.verifiedStrategy?{profile:state.profile,strategy:state.verifiedStrategy}:null,active:false};
+  writeState(next);
+  return {ok:true,state:publicState(next),message:'Предыдущий профиль восстановлен. Нажмите «Запустить сохранённую».'};
 });
 async function startAllComponents(operation, group = 'all') {
   checkOperation(operation);
@@ -1075,10 +1108,10 @@ registerIpc('engine:testStrategy', async (_event, strategy) => {
     if ((await otherWinwsPids({ force: true })).length) return { ok: false, message: 'Сначала остановите внешний zapret/Winws: одновременные движки нельзя тестировать корректно.' };
     const session = await prepareDpiCheck(operation,state.profile);
     if (session.errors.length) return dnsFailureReport(session);
-    operation.dpiRouteDomains=[...state.profile.domains];
+    operation.dpiRouteDomains=[...createProfile({...state.profile,catalogVersion:strategy.startsWith('fs1104')?2:state.profile.catalogVersion}).domains];
     testStarted = true;
     await stopEngine();
-    const profile = createProfile({ ...state.profile, strategy });
+    const profile = createProfile({ ...state.profile, strategy, catalogVersion:strategy.startsWith('fs1104')?2:state.profile.catalogVersion });
     writeState({ ...state, profile, active: false });
     pushLog(`Тест стратегии «${strategy}» начат.`);
     const started = await startEngine();
@@ -1089,7 +1122,7 @@ registerIpc('engine:testStrategy', async (_event, strategy) => {
     const passed = results.every((result) => result.success);
     const message = (passed ? `Стратегия «${strategy}» прошла HTTP-проверку; видео и голос не проверялись.` : `Стратегия «${strategy}» не прошла тест.`)+' Тест завершён, DPI остановлен.';
     const verified = passed
-      ? { ...readState(), profile, verifiedStrategy: strategy, active: false }
+      ? { ...readState(), profile, verifiedStrategy: strategy, previousDpi:previousDpiProfile(state,strategy), active: false }
       : { ...readState(), profile: state.profile, verifiedStrategy: state.verifiedStrategy, active: false };
     writeState(verified);
     pushLog(message);
@@ -1113,14 +1146,14 @@ registerIpc('engine:autoSelect', async () => {
     if ((await otherWinwsPids({force:true})).length) return {ok:false,message:'Сначала остановите внешний zapret/Winws: одновременные движки нельзя тестировать корректно.'};
     const session = await prepareDpiCheck(operation,state.profile);
     if (session.errors.length) return dnsFailureReport(session);
-    operation.dpiRouteDomains=[...state.profile.domains];
+    operation.dpiRouteDomains=[...createProfile({...state.profile,catalogVersion:2}).domains];
     if (engineIsRunning()) await stopEngine();
     const strategies = orderedAutoStrategies(state.verifiedStrategy);
     for (const [index, strategy] of strategies.entries()) {
       operation.progress = { strategy, index: index + 1, total: strategies.length };
       publishProgress();
       if (operation.cancelled) return { ok: false, message: 'Автоподбор остановлен пользователем.' };
-      const profile = createProfile({ ...state.profile, strategy });
+      const profile = createProfile({ ...state.profile, strategy, catalogVersion:strategy.startsWith('fs1104')?2:state.profile.catalogVersion });
       writeState({ ...state, profile, active: false });
       let keepEngine = false;
       try {
@@ -1146,7 +1179,7 @@ registerIpc('engine:autoSelect', async () => {
         if (operation.cancelled) return { ok: false, message: 'Автоподбор остановлен пользователем.' };
         results.forEach((result) => pushLog(`${result.label} / ${strategy}: ${result.success ? 'успешно' : 'ошибка'} — ${result.detail}, ${result.durationMs} мс.`));
         if (results.every((result) => result.success)) {
-          const next = { ...readState(), profile, active: true, verifiedStrategy: strategy };
+          const next = { ...readState(), profile, active: true, verifiedStrategy: strategy, previousDpi:previousDpiProfile(state,strategy) };
           writeState(next); pushLog(`Автоподбор выбрал стратегию: ${strategy}.`);
           keepEngine = true;
           return { ok: true, state: { ...publicState(next), diagnostics: diagnostics(next), logs: engineLog }, message: `Подобрана стратегия: ${strategy}. HTTP-проверка пройдена; проверьте видео и голос в приложениях.` };
@@ -1169,8 +1202,20 @@ registerIpc('autostart:set', async (_event, enabled) => {
   const state = { ...result.state, active: engineIsRunning(), autoStart: cachedAutoStart };
   return { ...result, state: { ...publicState(state), diagnostics: diagnostics(state), logs: readLogs() } };
 });
+registerIpc('updates:check', async()=>({ok:true,update:await appUpdates.check({manual:true})}));
+registerIpc('updates:enable', (_event,enabled)=>{
+  if(typeof enabled!=='boolean')return {ok:false,message:'Некорректная настройка обновлений.'};
+  writeState({...readState(),updateChecksEnabled:enabled});
+  if(!enabled)appUpdates.cancel();
+  return {ok:true,enabled,update:appUpdates.snapshot()};
+});
+registerIpc('updates:open',()=>{
+  const latest=appUpdates.snapshot().latest;
+  if(!latest)return {ok:false,message:'Сначала проверьте обновления.'};
+  return shell.openExternal(latest.url).then(()=>({ok:true}));
+});
 registerIpc('external:open', (_event, url) => {
-  const allowed = new Set(['https://t.me/TheLocalRoute','https://max.ru/channel_LocalRoute','https://github.com/iKokTot/local-route']);
+  const allowed = new Set(['https://t.me/localroutedpi','https://max.ru/channel_LocalRoute','https://github.com/iKokTot/local-route']);
   if (!allowed.has(url)) return {ok:false,message:'Эта ссылка не разрешена.'};
   return shell.openExternal(url);
 });

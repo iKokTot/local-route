@@ -6,17 +6,19 @@ const path = require('node:path');
 const { createRequire } = require('node:module');
 const mainPath = path.join(__dirname, '../src/main.js');
 const mainRequire = createRequire(mainPath);
-function load({ vlessCheck, commands, networkDetect, spawnChild, checkInput, mockFs, httpsMock, prepareDpi, subscriptionDownload } = {}) {
+function load({ vlessCheck, commands, networkDetect, spawnChild, checkInput, mockFs, httpsMock, prepareDpi, subscriptionDownload, updateLoad } = {}) {
   const handlers = new Map();
   const appEvents = new Map();
   const tasks = [];
   const electron = {
+    shell:{openExternal:async url=>{tasks.push({url});}},
+    Notification:class {static isSupported(){return true;}constructor(options){this.options=options;}on(){}show(){tasks.push({notification:this.options});}},
     safeStorage: { isEncryptionAvailable: () => true, encryptString: value => Buffer.from('encrypted:' + value), decryptString: value => value.toString().replace(/^encrypted:/, '') },
     app: { isPackaged: true, getPath: () => 'C:\\Mock', requestSingleInstanceLock: () => true, on: (name, callback) => appEvents.set(name,callback), quit: () => tasks.push('quit'), whenReady: () => ({ then: () => ({ catch() {} }) }) },
     ipcMain: { handle: (name, callback) => handlers.set(name, callback) }
   };
   const context = vm.createContext({
-    require: (name) => name === 'electron' ? electron : name === './core/subscriptions' && subscriptionDownload ? {...mainRequire(name),downloadSubscription:subscriptionDownload} : name === './core/runtime-readiness' ? {waitForListener:async()=>{}} : name === './core/dpi-check' ? { ...mainRequire(name),prepareProbeSession:prepareDpi || (async()=>({errors:[],lookupFor:()=>undefined})) } : name === 'node:https' && httpsMock ? httpsMock : name === 'node:fs' && mockFs ? mockFs : name === './core/network' && networkDetect ? {detectVlessNetwork:networkDetect} : name === './core/vless-check' && vlessCheck ? {...mainRequire(name), runVlessCheck: vlessCheck } : name === './platform/windows' ? {
+    require: (name) => name === 'electron' ? electron : name === './core/app-updates' && updateLoad ? {...mainRequire(name),createUpdateChecker:options=>mainRequire(name).createUpdateChecker({...options,load:updateLoad})} : name === './core/subscriptions' && subscriptionDownload ? {...mainRequire(name),downloadSubscription:subscriptionDownload} : name === './core/runtime-readiness' ? {waitForListener:async()=>{}} : name === './core/dpi-check' ? { ...mainRequire(name),prepareProbeSession:prepareDpi || (async()=>({errors:[],lookupFor:()=>undefined})) } : name === 'node:https' && httpsMock ? httpsMock : name === 'node:fs' && mockFs ? mockFs : name === './core/network' && networkDetect ? {detectVlessNetwork:networkDetect} : name === './core/vless-check' && vlessCheck ? {...mainRequire(name), runVlessCheck: vlessCheck } : name === './platform/windows' ? {
       runCommand: commands || (async (...args) => { tasks.push(args); return ''; }), runWithInput: checkInput || (async () => ({ok:true})),
       spawnOwned:spawnChild || (()=>{throw new Error('No real processes in tests');}),
       inspectNetworkConflicts: async () => ({proxyEnabled:false,tunnelNames:[]}), terminateChild: async child => { if(child) child.exitCode=0; }
@@ -43,6 +45,39 @@ function load({ vlessCheck, commands, networkDetect, spawnChild, checkInput, moc
   return { handlers, context, tasks, appEvents };
 }
 
+test('Updates do not lock network operations, notify once and open only a validated release URL',async()=>{
+  let requests=0;
+  const version='99.0.0';
+  const {handlers,context,tasks}=load({updateLoad:async()=>{requests++;return [{tag_name:'v'+version,draft:false,prerelease:true,html_url:'https://evil.example',assets:[{name:`Local-Route-Setup-${version}-x64.exe`,state:'uploaded',size:10}]}];}});
+  vm.runInContext("beginOperation('telegram:start')",context);
+  assert.equal((await handlers.get('updates:open')()).ok,false);
+  const result=await handlers.get('updates:check')();assert.equal(result.update.latest.version,version);
+  await handlers.get('updates:check')();assert.equal(requests,1);
+  assert.equal(tasks.filter(t=>t.notification).length,1);
+  assert.equal(vm.runInContext('fixture.updateNotifiedVersion',context),version);
+  await handlers.get('updates:open')(null,'https://evil.example');
+  assert.deepEqual(tasks.find(t=>t.url),{url:'https://github.com/iKokTot/local-route/releases/tag/v99.0.0'});
+  assert.equal((await handlers.get('updates:enable')(null,false)).enabled,false);
+  assert.equal(vm.runInContext('fixture.updateChecksEnabled',context),false);
+  assert.equal((await handlers.get('updates:enable')(null,'false')).ok,false);
+  assert.equal(vm.runInContext('activeOperation.kind',context),'telegram:start');
+});
+test('Successful updated DPI trial retains previous profile and rollback restores its original domains',async()=>{
+  const {handlers,context}=load();
+  vm.runInContext(`fixture.profile=createProfile({services:['youtube','discord'],strategy:'zapretAlt12',catalogVersion:1});fixture.verifiedStrategy='zapretAlt12';otherWinwsPids=async()=>[];startEngine=async()=>({ok:true});stopEngine=async()=>{engineProcess=null;};probeTargets=async targets=>targets.map(t=>({...t,success:true}));`,context);
+  const result=await handlers.get('engine:testStrategy')(null,'fs1104Alt12');
+  assert.equal(result.ok,true);
+  assert.equal(vm.runInContext('fixture.previousDpi.strategy',context),'zapretAlt12');
+  assert.equal(vm.runInContext('fixture.previousDpi.profile.catalogVersion',context),1);
+  assert.equal(vm.runInContext('fixture.profile.catalogVersion',context),2);
+  vm.runInContext('engineProcess={exitCode:null,killed:false}',context);
+  assert.equal((await handlers.get('engine:restorePrevious')()).ok,false);
+  vm.runInContext('engineProcess=null',context);
+  const restored=await handlers.get('engine:restorePrevious')();
+  assert.equal(restored.ok,true);assert.equal(restored.state.verifiedStrategy,'zapretAlt12');
+  assert.equal(restored.state.profile.catalogVersion,1);
+  assert(!restored.state.profile.domains.includes('jnn-pa.googleapis.com'));
+});
 test('Route inspection uses trusted IPC and current saved profile without starting processes', async()=>{
   const {handlers,context}=load();
   vm.runInContext(`fixture.vless=createVlessProfile({mode:'exclude',excludedDomains:['avito.ru']});vlessProcess={exitCode:null,killed:false};`,context);

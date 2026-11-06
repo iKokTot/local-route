@@ -1,9 +1,18 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('localRoute', {
   readState: () => ipcRenderer.invoke('state:read'),
+  checkUpdates: () => ipcRenderer.invoke('updates:check'),
+  setUpdateChecks: (enabled) => ipcRenderer.invoke('updates:enable',enabled),
+  openUpdate: () => ipcRenderer.invoke('updates:open'),
+  onUpdate: (callback) => {
+    const listener=(_event,update)=>callback(update);
+    ipcRenderer.on('updates:changed',listener);
+    return ()=>ipcRenderer.removeListener('updates:changed',listener);
+  },
   saveProfile: (profile) => ipcRenderer.invoke('profile:save', profile),
   toggleEngine: () => ipcRenderer.invoke('engine:toggle'),
   startVerified: () => ipcRenderer.invoke('engine:startVerified'),
+  restorePreviousDpi: () => ipcRenderer.invoke('engine:restorePrevious'),
   autoSelect: () => ipcRenderer.invoke('engine:autoSelect'),
   stopEngine: () => ipcRenderer.invoke('engine:stop'),
   testStrategy: (strategy) => ipcRenderer.invoke('engine:testStrategy', strategy),
